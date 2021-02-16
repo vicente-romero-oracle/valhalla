@@ -812,8 +812,12 @@ public class Attr extends JCTree.Visitor {
      *  Check that all the types are references.
      */
     List<Type> attribTypes(List<JCExpression> trees, Env<AttrContext> env) {
+        return attribTypes(trees, env, false);
+    }
+
+    List<Type> attribTypes(List<JCExpression> trees, Env<AttrContext> env, boolean valueOK) {
         List<Type> types = attribAnyTypes(trees, env);
-        return chk.checkRefTypes(trees, types);
+        return chk.checkRefTypes(trees, types, valueOK);
     }
 
     /**
@@ -2543,7 +2547,7 @@ public class Attr extends JCTree.Visitor {
             Symbol msym = TreeInfo.symbol(tree.meth);
             restype = adjustMethodReturnType(msym, qualifier, methName, argtypes, restype);
 
-            chk.checkRefTypes(tree.typeargs, typeargtypes);
+            chk.checkRefTypes(tree.typeargs, typeargtypes, true);
 
             final Symbol symbol = TreeInfo.symbol(tree.meth);
             if (symbol != null) {
@@ -4930,7 +4934,7 @@ public class Attr extends JCTree.Visitor {
         Type clazztype = chk.checkClassType(tree.clazz.pos(), attribType(tree.clazz, env));
 
         // Attribute type parameters
-        List<Type> actuals = attribTypes(tree.arguments, env);
+        List<Type> actuals = attribTypes(tree.arguments, env, true);
 
         if (clazztype.hasTag(CLASS)) {
             List<Type> formals = clazztype.tsym.type.getTypeArguments();

@@ -861,10 +861,10 @@ public class Check {
      *  @param trees         Original trees, used for error reporting.
      *  @param types         The types to be checked.
      */
-    List<Type> checkRefTypes(List<JCExpression> trees, List<Type> types) {
+    List<Type> checkRefTypes(List<JCExpression> trees, List<Type> types, boolean valueOK) {
         List<JCExpression> tl = trees;
         for (List<Type> l = types; l.nonEmpty(); l = l.tail) {
-            l.head = checkRefType(tl.head.pos(), l.head, false);
+            l.head = checkRefType(tl.head.pos(), l.head, valueOK);
             tl = tl.tail;
         }
         return types;
