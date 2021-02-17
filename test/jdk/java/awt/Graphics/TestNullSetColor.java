@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -21,9 +21,27 @@
  * questions.
  */
 
-// key: compiler.err.feature.not.supported.in.source
-// key: compiler.misc.feature.inline.type
-// key: compiler.warn.source.no.system.modules.path
-// options: -source 13
 
-inline final class ValuesNotSupported {}
+import java.awt.Graphics;
+import java.awt.Color;
+import java.awt.image.BufferedImage;
+
+/**
+ * @test
+ * @bug 6436374
+ * @summary Verifies that passing null to setColor() will be ignored.
+ */
+public class TestNullSetColor {
+
+    public static void main(String[] argv) {
+        BufferedImage bi = new BufferedImage(100, 100, BufferedImage.TYPE_INT_ARGB);
+        Graphics g = bi.getGraphics();
+
+        g.setColor(Color.RED);
+        g.setColor(null);
+
+        if (g.getColor() != Color.RED) {
+            throw new RuntimeException("Setting setColor(null) is not ignored");
+        }
+    }
+}

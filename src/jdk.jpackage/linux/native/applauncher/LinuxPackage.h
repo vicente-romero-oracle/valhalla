@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -23,18 +23,17 @@
  * questions.
  */
 
-package java.lang;
+#ifndef LinuxPackage_h
+#define LinuxPackage_h
 
-import java.lang.annotation.*;
-import static java.lang.annotation.ElementType.*;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-/**
- * A class annotated {@code @__inline__} is an inline class.
- * This is a temporary workaround to enable use of inline types
- * in editors and IDEs that do not yet understand the 'inline' modifier.
- * @since 1.12
- */
-@Retention(RetentionPolicy.SOURCE)
-@Target(value={ElementType.TYPE, ElementType.TYPE_USE})
-public @interface __inline__ {
+char* getJvmLauncherLibPath(void);
+
+#ifdef __cplusplus
 }
+#endif
+
+#endif /* #ifndef LinuxPackage_h */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -20,15 +20,25 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+/**
+ * @test
+ * @bug 6211257
+ * @summary Verifies NPE is thrown for BasicStroke.createStrokedShape(null).
+ */
+import java.awt.BasicStroke;
+import java.awt.Shape;
 
-// options: -XDallowWithFieldOperator
-// key: compiler.err.value.instance.field.expected.here
+public class TestNullShape {
 
-final inline class Blah {
-    final int x;
-    static int si;
-    Blah() {
-        x = 10;
-        Blah b = __WithField(this.si, 10);
+    public static void main(String[] args) {
+
+        BasicStroke bs = new BasicStroke();
+        try {
+            Shape s = bs.createStrokedShape(null);
+            System.out.println("result: false");
+            throw new RuntimeException("NPE is expected");
+        } catch (NullPointerException ne) {
+            System.out.println("result (npe): true");
+        }
     }
 }

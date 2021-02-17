@@ -42,7 +42,7 @@ import static org.testng.Assert.*;
 public class InlineConstructorTest {
 
     // Target test class
-    static inline class SimpleInline {
+    static primitive class SimpleInline {
         public final int x;
 
         SimpleInline() {
@@ -61,7 +61,7 @@ public class InlineConstructorTest {
         String cn = INLINE_TYPE.getName();
         Class<?> c = Class.forName(cn);
 
-        assertTrue(c.isInlineClass());
+        assertTrue(c.isPrimitiveClass());
         assertEquals(c, INLINE_TYPE);
     }
 

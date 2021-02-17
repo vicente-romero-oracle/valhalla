@@ -23,20 +23,26 @@
 
 /**
  * @test
- * @bug 8260034 8260225 8260283
+ * @bug 8260034 8260225 8260283 8261037
  * @summary Generated inline type tests.
  * @run main/othervm -Xbatch compiler.valhalla.inlinetypes.TestGenerated
  */
 
 package compiler.valhalla.inlinetypes;
 
-inline class EmptyValue {
+primitive class EmptyValue {
 
 }
 
-inline class MyValue1 {
+primitive class MyValue1 {
     int x = 42;
     int[] array = new int[1];
+}
+
+primitive class MyValue2 {
+    int[] a = new int[1];
+    int[] b = new int[6];
+    int[] c = new int[5];
 }
 
 public class TestGenerated {
@@ -89,6 +95,33 @@ public class TestGenerated {
         }
     }
 
+    MyValue2 f5;
+
+    void test7(boolean b) {
+        MyValue2[] array1 = {new MyValue2(), new MyValue2(), new MyValue2(),
+                             new MyValue2(), new MyValue2(), new MyValue2()};
+        MyValue2 h = new MyValue2();
+        MyValue2 n = new MyValue2();
+        int[] array2 = new int[1];
+
+        for (int i = 0; i < 10; ++i) {
+          for (int j = 0; j < 10; ++j) {
+            array1[0] = array1[0];
+            if (i == 1) {
+              h = h;
+              array2[0] *= 42;
+            }
+          }
+        }
+        if (b) {
+          f5 = n;
+        }
+    }
+
+    boolean test8(MyValue1[] array) {
+        return array[0].array == array[0].array;
+    }
+
     public static void main(String[] args) {
         TestGenerated t = new TestGenerated();
         EmptyValue[] array1 = { new EmptyValue() };
@@ -102,6 +135,8 @@ public class TestGenerated {
             t.test4(array3);
             t.test5(array3);
             t.test6();
+            t.test7(false);
+            t.test8(array3);
         }
     }
 }

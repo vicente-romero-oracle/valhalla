@@ -146,9 +146,6 @@ public abstract class InlineTypeTest {
     private static final boolean SHUFFLE_TESTS = Boolean.parseBoolean(System.getProperty("ShuffleTests", "true"));
     private static final boolean PREFER_CL_FLAGS = Boolean.parseBoolean(System.getProperty("PreferCommandLineFlags", "false"));
 
-    // "jtreg -DXcomp=true" runs all the scenarios with -Xcomp. This is faster than "jtreg -javaoptions:-Xcomp".
-    protected static final boolean RUN_SCENARIOS_WITH_XCOMP = Boolean.parseBoolean(System.getProperty("Xcomp", "false"));
-
     // Pre-defined settings
     private static final String[] defaultFlags = {
         "-XX:-BackgroundCompilation"};
@@ -217,7 +214,6 @@ public abstract class InlineTypeTest {
     protected static final String COUNTEDLOOP = START + "CountedLoop\\b" + MID + "" + END;
     protected static final String COUNTEDLOOP_MAIN = START + "CountedLoop\\b" + MID + "main" + END;
     protected static final String TRAP   = START + "CallStaticJava" + MID + "uncommon_trap.*(unstable_if|predicate)" + END;
-    protected static final String RETURN = START + "Return" + MID + "returns" + END;
     protected static final String LINKTOSTATIC = START + "CallStaticJava" + MID + "linkToStatic" + END;
     protected static final String NPE = START + "CallStaticJava" + MID + "null_check" + END;
     protected static final String CALL = START + "CallStaticJava" + MID + END;
@@ -368,9 +364,6 @@ public abstract class InlineTypeTest {
                 String[] cmds = new String[0];
                 if (!PREFER_CL_FLAGS) {
                     cmds = InputArguments.getVmInputArgs();
-                }
-                if (RUN_SCENARIOS_WITH_XCOMP) {
-                    cmds = concat(cmds, "-Xcomp");
                 }
                 cmds = concat(cmds, test.getVMParameters(i));
                 cmds = concat(cmds, test.getExtraVMParameters(i));
@@ -579,9 +572,7 @@ public abstract class InlineTypeTest {
                 continue;
             }
             String graph = compilations.get(testName);
-            if (PRINT_GRAPH) {
-                System.out.println("\nGraph for " + testName + "\n" + graph);
-            }
+            System.out.println("\nGraph for " + testName + "\n" + graph);
             // Parse graph using regular expressions to determine if it contains forbidden nodes
             Test[] annos = test.getAnnotationsByType(Test.class);
             Test anno = Arrays.stream(annos).filter(TestAnnotation::find).findFirst().orElse(null);

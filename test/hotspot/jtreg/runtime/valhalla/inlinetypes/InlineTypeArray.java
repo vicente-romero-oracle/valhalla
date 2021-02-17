@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2018, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -244,7 +244,7 @@ public class InlineTypeArray {
         assertEquals(x, 1, "Bad Point Value");
     }
 
-    static final inline class MyInt implements Comparable<MyInt.ref> {
+    static final primitive class MyInt implements Comparable<MyInt.ref> {
         final int value;
 
         private MyInt() { this(0); }
@@ -277,7 +277,7 @@ public class InlineTypeArray {
         default String hi() { return "Hi"; }
     }
 
-    static final inline class MyOtherInt implements SomeSecondaryType {
+    static final primitive class MyOtherInt implements SomeSecondaryType {
         final int value;
         private MyOtherInt() { value = 0; }
     }
@@ -289,7 +289,7 @@ public class InlineTypeArray {
         assertTrue(myInts instanceof MyInt.ref[]);
 
         Class<?> cls = MyInt.class;
-        assertTrue(cls.isInlineClass());
+        assertTrue(cls.isPrimitiveClass());
         Object arrObj = Array.newInstance(cls, 1);
         assertTrue(arrObj instanceof Object[], "Not Object array");
         assertTrue(arrObj instanceof Comparable[], "Not Comparable array");
@@ -465,7 +465,7 @@ public class InlineTypeArray {
         } catch (NullPointerException npe) {}
     }
 
-    static final inline class MyPoint {
+    static final primitive class MyPoint {
         final               MyInt x;
         final               MyInt y;
 
