@@ -2238,7 +2238,7 @@ public class Types {
             t = t.isPrimitiveClass() ? t.referenceProjection() : t;
 
         if (sym.type == syms.objectType) { //optimization
-            if (!isPrimitiveClass(t))
+            //if (!isPrimitiveClass(t))
                 return syms.objectType;
         }
         if (sym.type == syms.identityObjectType) {

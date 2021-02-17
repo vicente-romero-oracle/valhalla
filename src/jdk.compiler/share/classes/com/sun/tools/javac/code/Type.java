@@ -1763,12 +1763,19 @@ public abstract class Type extends AnnoConstruct implements TypeMirror, PoolCons
          */
         public Type lower;
 
+        public boolean universal = false;
+
         public TypeVar(Name name, Symbol owner, Type lower) {
+            this(name, owner, lower, false);
+        }
+
+        public TypeVar(Name name, Symbol owner, Type lower, boolean universal) {
             super(null, TypeMetadata.EMPTY);
             Assert.checkNonNull(lower);
             tsym = new TypeVariableSymbol(0, name, this, owner);
             this.setUpperBound(null);
             this.lower = lower;
+            this.universal = universal;
         }
 
         public TypeVar(TypeSymbol tsym, Type bound, Type lower) {

@@ -554,7 +554,11 @@ public class TreeMaker implements JCTree.Factory {
     }
 
     public JCTypeParameter TypeParameter(Name name, List<JCExpression> bounds, List<JCAnnotation> annos) {
-        JCTypeParameter tree = new JCTypeParameter(name, bounds, annos);
+        return TypeParameter(name, bounds, annos, false);
+    }
+
+    public JCTypeParameter TypeParameter(Name name, List<JCExpression> bounds, List<JCAnnotation> annos, boolean universal) {
+        JCTypeParameter tree = new JCTypeParameter(name, bounds, annos, universal);
         tree.pos = pos;
         return tree;
     }
