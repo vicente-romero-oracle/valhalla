@@ -608,6 +608,8 @@ public class Types {
 
         boolean tValue = t.isPrimitiveClass();
         boolean sValue = s.isPrimitiveClass();
+        if ((s.hasTag(TYPEVAR)) && ((TypeVar)s).isUniversal() && t.hasTag(BOT))
+            return false;
         if (tValue != sValue) {
             return tValue ?
                     isSubtype(t.referenceProjection(), s) :
@@ -2268,8 +2270,10 @@ public class Types {
                     return t;
 
                 // No man may be an island, but the bell tolls for a value.
-                if (isPrimitiveClass(t))
+                /*
+                 if (isPrimitiveClass(t))
                     return null;
+                 */
 
                 Symbol c = t.tsym;
                 if (!seenTypes.add(c)) {
@@ -3614,7 +3618,7 @@ public class Types {
         private static final TypeMapping<Void> newInstanceFun = new TypeMapping<Void>() {
             @Override
             public TypeVar visitTypeVar(TypeVar t, Void _unused) {
-                return new TypeVar(t.tsym, t.getUpperBound(), t.getLowerBound(), t.getMetadata());
+                return new TypeVar(t.tsym, t.getUpperBound(), t.getLowerBound(), t.getMetadata(), t.universal);
             }
         };
     // </editor-fold>

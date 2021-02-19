@@ -1784,10 +1784,16 @@ public abstract class Type extends AnnoConstruct implements TypeMirror, PoolCons
 
         public TypeVar(TypeSymbol tsym, Type bound, Type lower,
                        TypeMetadata metadata) {
+            this(tsym, bound, lower, metadata, false);
+        }
+
+        public TypeVar(TypeSymbol tsym, Type bound, Type lower,
+                       TypeMetadata metadata, boolean universal) {
             super(tsym, metadata);
             Assert.checkNonNull(lower);
             this.setUpperBound(bound);
             this.lower = lower;
+            this.universal = universal;
         }
 
         @Override
@@ -1847,6 +1853,10 @@ public abstract class Type extends AnnoConstruct implements TypeMirror, PoolCons
         @Override @DefinedBy(Api.LANGUAGE_MODEL)
         public <R, P> R accept(TypeVisitor<R, P> v, P p) {
             return v.visitTypeVariable(this, p);
+        }
+
+        public boolean isUniversal() {
+            return universal;
         }
     }
 
@@ -2121,15 +2131,7 @@ public abstract class Type extends AnnoConstruct implements TypeMirror, PoolCons
 
         @DefinedBy(Api.LANGUAGE_MODEL)
         public String toString() {
-            StringBuilder sb = new StringBuilder();
-            appendAnnotationsString(sb);
-            if (inst == null) {
-                sb.append(qtype);
-                sb.append('?');
-            } else {
-                sb.append(inst);
-            }
-            return sb.toString();
+            return debugString();
         }
 
         public String debugString() {
