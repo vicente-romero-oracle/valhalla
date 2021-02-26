@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -25,7 +25,6 @@
 #ifndef SHARE_OOPS_INSTANCEKLASS_HPP
 #define SHARE_OOPS_INSTANCEKLASS_HPP
 
-#include "classfile/classLoaderData.hpp"
 #include "code/vmreg.hpp"
 #include "memory/referenceType.hpp"
 #include "oops/annotations.hpp"
@@ -293,7 +292,8 @@ class InstanceKlass: public Klass {
     _misc_is_declared_atomic                  = 1 << 19, // implements jl.NonTearable
     _misc_invalid_inline_super                = 1 << 20, // invalid super type for an inline type
     _misc_invalid_identity_super              = 1 << 21, // invalid super type for an identity type
-    _misc_has_injected_identityObject         = 1 << 22  // IdentityObject has been injected by the JVM
+    _misc_has_injected_identityObject         = 1 << 22, // IdentityObject has been injected by the JVM
+    _misc_has_injected_primitiveObject        = 1 << 23  // PrimitiveObject has been injected by the JVM
   };
 
   // (*) An inline type is considered empty if it contains no non-static fields or
@@ -484,6 +484,14 @@ class InstanceKlass: public Klass {
     _misc_flags |= _misc_has_injected_identityObject;
   }
 
+  bool has_injected_primitiveObject() const {
+    return (_misc_flags & _misc_has_injected_primitiveObject);
+  }
+
+  void set_has_injected_primitiveObject() {
+    _misc_flags |= _misc_has_injected_primitiveObject;
+  }
+
   // field sizes
   int nonstatic_field_size() const         { return _nonstatic_field_size; }
   void set_nonstatic_field_size(int size)  { _nonstatic_field_size = size; }
@@ -629,7 +637,7 @@ public:
   // packages returned by get_system_packages().
   // For packages whose classes are loaded from the boot loader class path, the
   // classpath_index indicates which entry on the boot loader class path.
-  void set_classpath_index(s2 path_index, TRAPS);
+  void set_classpath_index(s2 path_index);
   bool is_same_class_package(const Klass* class2) const;
   bool is_same_class_package(oop other_class_loader, const Symbol* other_class_name) const;
 
