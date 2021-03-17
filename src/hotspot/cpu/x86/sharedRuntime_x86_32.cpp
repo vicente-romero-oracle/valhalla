@@ -371,14 +371,6 @@ bool SharedRuntime::is_wide_vector(int size) {
   return size > 16;
 }
 
-size_t SharedRuntime::trampoline_size() {
-  return 16;
-}
-
-void SharedRuntime::generate_trampoline(MacroAssembler *masm, address destination) {
-  __ jump(RuntimeAddress(destination));
-}
-
 // The java_calling_convention describes stack locations as ideal slots on
 // a frame with no abi restrictions. Since we must observe abi restrictions
 // (like the placement of the register window) the slots must be biased by
@@ -3004,10 +2996,12 @@ BufferedInlineTypeBlob* SharedRuntime::generate_buffered_inline_type_adapter(con
   return NULL;
 }
 
-BufferBlob* SharedRuntime::make_native_invoker(address call_target,
+#ifdef COMPILER2
+RuntimeStub* SharedRuntime::make_native_invoker(address call_target,
                                                 int shadow_space_bytes,
                                                 const GrowableArray<VMReg>& input_registers,
                                                 const GrowableArray<VMReg>& output_registers) {
   ShouldNotCallThis();
   return nullptr;
 }
+#endif

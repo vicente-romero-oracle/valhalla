@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -19,10 +19,22 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
+ *
  */
 
-public
-@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
-@interface A {
-    B b();
+#ifndef SHARE_OOPS_ARRAY_INLINE_HPP
+#define SHARE_OOPS_ARRAY_INLINE_HPP
+
+#include "memory/allocation.hpp"
+#include "memory/metaspace.hpp"
+#include "oops/array.hpp"
+
+
+template <typename T>
+inline void* Array<T>::operator new(size_t size, ClassLoaderData* loader_data, int length, TRAPS) throw() {
+  size_t word_size = Array::size(length);
+  return (void*) Metaspace::allocate(loader_data, word_size,
+                                     MetaspaceObj::array_type(sizeof(T)), THREAD);
 }
+
+#endif // SHARE_OOPS_ARRAY_INLINE_HPP

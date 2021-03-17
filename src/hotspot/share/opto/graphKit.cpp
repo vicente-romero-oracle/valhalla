@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -1897,7 +1897,7 @@ Node* GraphKit::set_results_for_java_call(CallJavaNode* call, bool separate_io_p
     // Return of multiple values (inline type fields): we create a
     // InlineType node, each field is a projection from the call.
     ciInlineKlass* vk = call->method()->return_type()->as_inline_klass();
-    uint base_input = TypeFunc::Parms + 1;
+    uint base_input = TypeFunc::Parms;
     ret = InlineTypeNode::make_from_multi(this, call, vk, base_input, false);
   } else {
     ret = _gvn.transform(new ProjNode(call, TypeFunc::Parms));
@@ -2019,7 +2019,10 @@ void GraphKit::replace_call(CallNode* call, Node* result, bool do_replaced_nodes
 
   // Replace the result with the new result if it exists and is used
   if (callprojs->resproj[0] != NULL && result != NULL) {
-    assert(callprojs->nb_resproj == 1, "unexpected number of results");
+    // If the inlined code is dead, the result projections for an inline type returned as
+    // fields have not been replaced. They will go away once the call is replaced by TOP below.
+    assert(callprojs->nb_resproj == 1 || (call->tf()->returns_inline_type_as_fields() && stopped()),
+           "unexpected number of results");
     C->gvn_replace_by(callprojs->resproj[0], result);
   }
 
@@ -2096,9 +2099,9 @@ void GraphKit::increment_counter(address counter_addr) {
 void GraphKit::increment_counter(Node* counter_addr) {
   int adr_type = Compile::AliasIdxRaw;
   Node* ctrl = control();
-  Node* cnt  = make_load(ctrl, counter_addr, TypeInt::INT, T_INT, adr_type, MemNode::unordered);
-  Node* incr = _gvn.transform(new AddINode(cnt, _gvn.intcon(1)));
-  store_to_memory(ctrl, counter_addr, incr, T_INT, adr_type, MemNode::unordered);
+  Node* cnt  = make_load(ctrl, counter_addr, TypeLong::LONG, T_LONG, adr_type, MemNode::unordered);
+  Node* incr = _gvn.transform(new AddLNode(cnt, _gvn.longcon(1)));
+  store_to_memory(ctrl, counter_addr, incr, T_LONG, adr_type, MemNode::unordered);
 }
 
 
@@ -2739,9 +2742,9 @@ Node* GraphKit::make_native_call(const TypeFunc* call_type, uint nargs, ciNative
 
   address call_addr = nep->entry_point();
   if (nep->need_transition()) {
-    BufferBlob* invoker = SharedRuntime::make_native_invoker(call_addr,
-                                                             nep->shadow_space(),
-                                                             arg_regs, ret_regs);
+    RuntimeStub* invoker = SharedRuntime::make_native_invoker(call_addr,
+                                                              nep->shadow_space(),
+                                                              arg_regs, ret_regs);
     if (invoker == NULL) {
       C->record_failure("native invoker not implemented on this platform");
       return NULL;
@@ -3959,7 +3962,9 @@ static void hook_memory_on_init(GraphKit& kit, int alias_idx,
 
   Node* prevmem = kit.memory(alias_idx);
   init_in_merge->set_memory_at(alias_idx, prevmem);
-  kit.set_memory(init_out_raw, alias_idx);
+  if (init_out_raw != NULL) {
+    kit.set_memory(init_out_raw, alias_idx);
+  }
 }
 
 //---------------------------set_output_for_allocation-------------------------
@@ -4023,7 +4028,10 @@ Node* GraphKit::set_output_for_allocation(AllocateNode* alloc,
           int off_in_vt = field->offset() - vk->first_field_offset();
           const TypePtr* adr_type = arytype->with_field_offset(off_in_vt)->add_offset(Type::OffsetBot);
           int fieldidx = C->get_alias_index(adr_type, true);
-          hook_memory_on_init(*this, fieldidx, minit_in, minit_out);
+          // Pass NULL for init_out. Having per flat array element field memory edges as uses of the Initialize node
+          // can result in per flat array field Phis to be created which confuses the logic of
+          // Compile::adjust_flattened_array_access_aliases().
+          hook_memory_on_init(*this, fieldidx, minit_in, NULL);
         }
         C->set_flattened_accesses_share_alias(true);
         hook_memory_on_init(*this, C->get_alias_index(TypeAryPtr::INLINES), minit_in, minit_out);

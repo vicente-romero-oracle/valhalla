@@ -2131,7 +2131,15 @@ public abstract class Type extends AnnoConstruct implements TypeMirror, PoolCons
 
         @DefinedBy(Api.LANGUAGE_MODEL)
         public String toString() {
-            return debugString();
+            StringBuilder sb = new StringBuilder();
+            appendAnnotationsString(sb);
+            if (inst == null) {
+                sb.append(qtype);
+                sb.append('?');
+            } else {
+                sb.append(inst);
+            }
+            return sb.toString();
         }
 
         public String debugString() {

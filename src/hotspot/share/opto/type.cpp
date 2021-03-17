@@ -43,6 +43,7 @@
 #include "opto/opcodes.hpp"
 #include "opto/type.hpp"
 #include "utilities/powerOfTwo.hpp"
+#include "utilities/stringUtils.hpp"
 
 // Portions of code courtesy of Clifford Click
 
@@ -1217,6 +1218,7 @@ Type::Category Type::category() const {
     case Type::DoubleTop:
     case Type::DoubleCon:
     case Type::DoubleBot:
+    case Type::InlineType:
       return Category::Data;
     case Type::Memory:
       return Category::Memory;
@@ -1586,6 +1588,7 @@ const Type *TypeInt::xmeet( const Type *t ) const {
   case DoubleTop:
   case DoubleCon:
   case DoubleBot:
+  case InlineType:
   case Bottom:                  // Ye Olde Default
     return Type::BOTTOM;
   default:                      // All else is a mistake
@@ -2115,8 +2118,7 @@ const TypeTuple *TypeTuple::make_range(ciSignature* sig, bool ret_vt_fields) {
   case T_INLINE_TYPE:
     if (ret_vt_fields) {
       uint pos = TypeFunc::Parms;
-      field_array[pos] = TypePtr::BOTTOM;
-      pos++;
+      field_array[pos++] = get_const_type(return_type);
       collect_inline_fields(return_type->as_inline_klass(), field_array, pos);
     } else {
       field_array[TypeFunc::Parms] = get_const_type(return_type)->join_speculative(TypePtr::NOTNULL);
@@ -4418,15 +4420,23 @@ int TypeInstPtr::hash(void) const {
 //------------------------------dump2------------------------------------------
 // Dump oop Type
 #ifndef PRODUCT
-void TypeInstPtr::dump2( Dict &d, uint depth, outputStream *st ) const {
+void TypeInstPtr::dump2(Dict &d, uint depth, outputStream* st) const {
   // Print the name of the klass.
   klass()->print_name_on(st);
 
   switch( _ptr ) {
   case Constant:
-    // TO DO: Make CI print the hex address of the underlying oop.
     if (WizardMode || Verbose) {
-      const_oop()->print_oop(st);
+      ResourceMark rm;
+      stringStream ss;
+
+      st->print(" ");
+      const_oop()->print_oop(&ss);
+      // 'const_oop->print_oop()' may emit newlines('\n') into ss.
+      // suppress newlines from it so -XX:+Verbose -XX:+PrintIdeal dumps one-liner for each node.
+      char* buf = ss.as_string(/* c_heap= */false);
+      StringUtils::replace_no_expand(buf, "\n", "");
+      st->print_raw(buf);
     }
   case BotPTR:
     if (!WizardMode && !Verbose) {
