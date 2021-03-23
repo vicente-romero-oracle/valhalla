@@ -812,12 +812,12 @@ public class Attr extends JCTree.Visitor {
      *  Check that all the types are references.
      */
     List<Type> attribTypes(List<JCExpression> trees, Env<AttrContext> env) {
-        return attribTypes(trees, env, false);
+        return attribTypes(trees, env, false, false);
     }
 
-    List<Type> attribTypes(List<JCExpression> trees, Env<AttrContext> env, boolean valueOK) {
+    List<Type> attribTypes(List<JCExpression> trees, Env<AttrContext> env, boolean valueOK, boolean universalTV) {
         List<Type> types = attribAnyTypes(trees, env);
-        return chk.checkRefTypes(trees, types, valueOK);
+        return chk.checkRefTypes(trees, types, valueOK, universalTV);
     }
 
     /**
@@ -2547,7 +2547,7 @@ public class Attr extends JCTree.Visitor {
             Symbol msym = TreeInfo.symbol(tree.meth);
             restype = adjustMethodReturnType(msym, qualifier, methName, argtypes, restype);
 
-            chk.checkRefTypes(tree.typeargs, typeargtypes, true);
+            chk.checkRefTypes(tree.typeargs, typeargtypes, true, false);
 
             final Symbol symbol = TreeInfo.symbol(tree.meth);
             if (symbol != null) {
@@ -4934,7 +4934,8 @@ public class Attr extends JCTree.Visitor {
         Type clazztype = chk.checkClassType(tree.clazz.pos(), attribType(tree.clazz, env));
 
         // Attribute type parameters
-        List<Type> actuals = attribTypes(tree.arguments, env, true);
+        ClassSymbol cs = (ClassSymbol)TreeInfo.symbol(tree);
+        List<Type> actuals = attribTypes(tree.arguments, env, true, cs.type.allparams().stream().allMatch(t -> ((TypeVar)t).universal));
 
         if (clazztype.hasTag(CLASS)) {
             List<Type> formals = clazztype.tsym.type.getTypeArguments();
