@@ -4594,6 +4594,8 @@ public class JavacParser implements Parser {
             }
         }
         return toP(F.at(pos).TypeParameter(name, bounds.toList(), annos, universal));
+        // use the line below to make experiments setting all type variables as universal
+        //return toP(F.at(pos).TypeParameter(name, bounds.toList(), annos, true));
     }
 
     /** FormalParameters = "(" [ FormalParameterList ] ")"

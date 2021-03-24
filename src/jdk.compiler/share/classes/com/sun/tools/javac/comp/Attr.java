@@ -4456,6 +4456,15 @@ public class Attr extends JCTree.Visitor {
                     // Be sure to return the default value before examining bounds
                     return new VarSymbol(STATIC, names._default, site, site.tsym);
                 }
+                if (name == names.ref && ((TypeVar)site).universal) {
+                    TypeVar siteTV = (TypeVar)site;
+                    if (siteTV.referenceTypeVar == null) {
+                        siteTV.referenceTypeVar = new TypeVar(new TypeVariableSymbol(siteTV.tsym.flags(), siteTV.tsym.name, null, siteTV.tsym.owner),
+                                siteTV.getUpperBound(), siteTV.getLowerBound(), siteTV.getMetadata(), false);
+                        siteTV.referenceTypeVar.tsym.type = siteTV.referenceTypeVar;
+                    }
+                    return siteTV.referenceTypeVar.tsym;
+                }
                 // Normally, site.getUpperBound() shouldn't be null.
                 // It should only happen during memberEnter/attribBase
                 // when determining the super type which *must* be

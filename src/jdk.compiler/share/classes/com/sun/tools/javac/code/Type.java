@@ -1765,6 +1765,11 @@ public abstract class Type extends AnnoConstruct implements TypeMirror, PoolCons
 
         public boolean universal = false;
 
+        /** if this type variable is universal then it will also have a link to a pure reference
+         *  type variable
+         */
+        public TypeVar referenceTypeVar = null;
+
         public TypeVar(Name name, Symbol owner, Type lower) {
             this(name, owner, lower, false);
         }
