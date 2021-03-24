@@ -88,6 +88,17 @@ public class UniversalTVarsCompilationTests extends CompilationTestCase {
         );
     }
 
+    public void testUniversalTVarFieldMustBeInit() {
+        assertFail("compiler.err.var.might.not.have.been.initialized",
+                """
+                class Box<__universal T> {
+                    T t;
+                    Box() {}
+                }
+                """
+        );
+    }
+
     public void testPosCompilations() {
         assertOK(
                 """
