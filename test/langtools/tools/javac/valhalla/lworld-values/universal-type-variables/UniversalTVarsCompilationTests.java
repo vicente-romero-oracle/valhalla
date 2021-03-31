@@ -97,6 +97,15 @@ public class UniversalTVarsCompilationTests extends CompilationTestCase {
                 }
                 """
         );
+
+        assertOK(
+                """
+                class Box<__universal T> {
+                    T.ref t;
+                    Box() {}
+                }
+                """
+        );
     }
 
     public void testPosCompilations() {
