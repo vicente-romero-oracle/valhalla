@@ -4463,6 +4463,8 @@ public class Attr extends JCTree.Visitor {
                         siteTV.referenceTypeVar = new TypeVar(siteTV.tsym,
                                 //new TypeVariableSymbol(siteTV.tsym.flags(), siteTV.tsym.name, null, siteTV.tsym.owner),
                                 siteTV.getUpperBound(), siteTV.getLowerBound(), siteTV.getMetadata(), false);
+                        siteTV.referenceTypeVar.createdFromUniversalTypeVar = true;
+                        siteTV.referenceTypeVar.universalTypeVar = siteTV;
                         //siteTV.referenceTypeVar.tsym.type = siteTV.referenceTypeVar;
                         TypeVariableSymbol tmpTVarSym = new TypeVariableSymbol(siteTV.tsym.flags(), siteTV.tsym.name, null, siteTV.tsym.owner);
                         tmpTVarSym.type = siteTV.referenceTypeVar;

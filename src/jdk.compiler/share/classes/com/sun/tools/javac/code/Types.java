@@ -3480,6 +3480,12 @@ public class Types {
                 if (t.equalsIgnoreMetadata(from.head)) {
                     return to.head.withTypeVar(t);
                 }
+                if (t.createdFromUniversalTypeVar &&
+                        from.head.hasTag(TYPEVAR) &&
+                        ((TypeVar)from.head).referenceTypeVar != null &&
+                        t.equalsIgnoreMetadata(((TypeVar)from.head).referenceTypeVar)) {
+                    return to.head.withTypeVar(t);
+                }
             }
             return t;
         }
@@ -3629,7 +3635,14 @@ public class Types {
         private static final TypeMapping<Void> newInstanceFun = new TypeMapping<Void>() {
             @Override
             public TypeVar visitTypeVar(TypeVar t, Void _unused) {
-                return new TypeVar(t.tsym, t.getUpperBound(), t.getLowerBound(), t.getMetadata(), t.universal);
+                TypeVar newTV = new TypeVar(t.tsym, t.getUpperBound(), t.getLowerBound(), t.getMetadata(), t.universal);
+                if (t.referenceTypeVar != null) {
+                    newTV.referenceTypeVar = new TypeVar(t.tsym,
+                            t.getUpperBound(), t.getLowerBound(), t.getMetadata(), false);
+                    newTV.referenceTypeVar.createdFromUniversalTypeVar = true;
+                    newTV.referenceTypeVar.universalTypeVar = newTV;
+                }
+                return newTV;
             }
         };
     // </editor-fold>

@@ -147,5 +147,44 @@ public class UniversalTVarsCompilationTests extends CompilationTestCase {
                 }
                 """
         );
+        assertOK(
+                """
+                import java.util.*;
+
+                interface I {}
+
+                class Test {
+                    <__universal T> T.ref bar() {
+                        return null;
+                    }
+
+                    void foo() {
+                        List<? extends I> values = bar();
+                    }
+                }
+                """
+        );
+
+        assertOK(
+                """
+                class Test<__universal T> {
+                    T.ref t;
+
+                    void m() {
+                        this.t = null;
+                    }
+                }
+                """
+        );
+
+        assertOK(
+                """
+                import java.util.*;
+
+                class Test {
+                    Map<String, String> types = new HashMap<>();
+                }
+                """
+        );
     }
 }

@@ -1765,12 +1765,20 @@ public abstract class Type extends AnnoConstruct implements TypeMirror, PoolCons
 
         public boolean universal = false;
 
+        public boolean createdFromUniversalTypeVar = false;
+
         /** if this type variable is universal then it will also have a link to a pure reference
          *  type variable, it is important to know that a universal type variable and its
          *  corresponding referenceTyepVar share the same tsym. So if it is needed to double check if
          *  a type variable is universal or not, we need to check its type not the type of its tsym
          */
         public TypeVar referenceTypeVar = null;
+
+        /** link back to universal type var when applicable, this field will have a value if  this current
+         *  type variable was derived form a type variable declaration using the .ref suffix, once the code
+         *  more mature we can fold fields referenceTypeVar and universalTypeVar
+         */
+        public TypeVar universalTypeVar = null;
 
         public TypeVar(Name name, Symbol owner, Type lower) {
             this(name, owner, lower, false);
@@ -1864,6 +1872,16 @@ public abstract class Type extends AnnoConstruct implements TypeMirror, PoolCons
 
         public boolean isUniversal() {
             return universal;
+        }
+
+        @Override
+        public Type withTypeVar(Type t) {
+            if (t.hasTag(TYPEVAR) &&
+                    ((TypeVar)t).createdFromUniversalTypeVar &&
+                    referenceTypeVar != null) {
+                return referenceTypeVar;
+            }
+            return this;
         }
     }
 
@@ -2138,15 +2156,7 @@ public abstract class Type extends AnnoConstruct implements TypeMirror, PoolCons
 
         @DefinedBy(Api.LANGUAGE_MODEL)
         public String toString() {
-            StringBuilder sb = new StringBuilder();
-            appendAnnotationsString(sb);
-            if (inst == null) {
-                sb.append(qtype);
-                sb.append('?');
-            } else {
-                sb.append(inst);
-            }
-            return sb.toString();
+            return debugString();
         }
 
         public String debugString() {
