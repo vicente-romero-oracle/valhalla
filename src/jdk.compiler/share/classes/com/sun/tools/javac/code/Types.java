@@ -1050,6 +1050,11 @@ public class Types {
                 }
             } else if (isSubtype(t, s, capture)) {
                 return true;
+            } else if (t.hasTag(TYPEVAR) && s.hasTag(TYPEVAR) && t.tsym == s.tsym) {
+                // we are seeing a case of a universal type variable being assigned to a non-universal one, we will need
+                // to create a new lint category for the assignment between universal and not universal type vars
+                warn.warn(LintCategory.UNCHECKED);
+                return true;
             } else if (t.hasTag(TYPEVAR)) {
                 return isSubtypeUncheckedInternal(t.getUpperBound(), s, false, warn);
             } else if (!s.isRaw()) {

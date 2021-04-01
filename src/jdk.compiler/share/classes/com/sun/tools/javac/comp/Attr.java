@@ -4319,7 +4319,8 @@ public class Attr extends JCTree.Visitor {
             sym = selectSym(tree, sitesym, site, env, resultInfo);
         }
         boolean varArgs = env.info.lastResolveVarargs();
-        tree.sym = sym;
+        tree.sym = (site.getTag() == TYPEVAR && tree.name == names.ref) ?
+                sym.type.tsym : sym;
 
         if (site.hasTag(TYPEVAR) && !isType(sym) && sym.kind != ERR) {
             site = types.skipTypeVars(site, true);
@@ -4459,11 +4460,17 @@ public class Attr extends JCTree.Visitor {
                 if (name == names.ref && ((TypeVar)site).universal) {
                     TypeVar siteTV = (TypeVar)site;
                     if (siteTV.referenceTypeVar == null) {
-                        siteTV.referenceTypeVar = new TypeVar(new TypeVariableSymbol(siteTV.tsym.flags(), siteTV.tsym.name, null, siteTV.tsym.owner),
+                        siteTV.referenceTypeVar = new TypeVar(siteTV.tsym,
+                                //new TypeVariableSymbol(siteTV.tsym.flags(), siteTV.tsym.name, null, siteTV.tsym.owner),
                                 siteTV.getUpperBound(), siteTV.getLowerBound(), siteTV.getMetadata(), false);
-                        siteTV.referenceTypeVar.tsym.type = siteTV.referenceTypeVar;
+                        //siteTV.referenceTypeVar.tsym.type = siteTV.referenceTypeVar;
+                        TypeVariableSymbol tmpTVarSym = new TypeVariableSymbol(siteTV.tsym.flags(), siteTV.tsym.name, null, siteTV.tsym.owner);
+                        tmpTVarSym.type = siteTV.referenceTypeVar;
                     }
-                    return siteTV.referenceTypeVar.tsym;
+                    TypeVariableSymbol tmpTVarSym = new TypeVariableSymbol(siteTV.tsym.flags(), siteTV.tsym.name, null, siteTV.tsym.owner);
+                    tmpTVarSym.type = siteTV.referenceTypeVar;
+                    //return siteTV.referenceTypeVar.tsym;
+                    return tmpTVarSym;
                 }
                 // Normally, site.getUpperBound() shouldn't be null.
                 // It should only happen during memberEnter/attribBase

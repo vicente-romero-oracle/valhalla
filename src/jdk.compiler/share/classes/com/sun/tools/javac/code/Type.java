@@ -1766,7 +1766,9 @@ public abstract class Type extends AnnoConstruct implements TypeMirror, PoolCons
         public boolean universal = false;
 
         /** if this type variable is universal then it will also have a link to a pure reference
-         *  type variable
+         *  type variable, it is important to know that a universal type variable and its
+         *  corresponding referenceTyepVar share the same tsym. So if it is needed to double check if
+         *  a type variable is universal or not, we need to check its type not the type of its tsym
          */
         public TypeVar referenceTypeVar = null;
 
