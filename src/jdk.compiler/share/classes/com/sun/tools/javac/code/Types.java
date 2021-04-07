@@ -1106,6 +1106,9 @@ public class Types {
     public boolean isSubtype(Type t, Type s, boolean capture) {
         if (t.equalsIgnoreMetadata(s))
             return true;
+        if (t.hasTag(TYPEVAR) && s.hasTag(TYPEVAR) && t.tsym == s.tsym) {
+            return true;
+        }
         if (s.isPartial())
             return isSuperType(s, t);
 
@@ -1645,6 +1648,16 @@ public class Types {
                 } else {
                     return false;
                 }
+            }
+
+            @Override
+            public Boolean visitTypeVar(TypeVar t, Type s) {
+                if (s.hasTag(TYPEVAR)) {
+                    TypeVar other = (TypeVar)s;
+                    if (t.universal != other.universal && t.tsym == other.tsym)
+                        return true;
+                }
+                return isSameType(t, s);
             }
 
             @Override

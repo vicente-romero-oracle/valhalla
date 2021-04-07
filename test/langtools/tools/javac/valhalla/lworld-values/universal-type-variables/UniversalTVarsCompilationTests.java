@@ -186,5 +186,41 @@ public class UniversalTVarsCompilationTests extends CompilationTestCase {
                 }
                 """
         );
+
+        assertOK(
+                """
+                class C1 {
+                    <__universal T> void foo(T t) {}
+                }
+
+                class C2 extends C1 {
+                    <__universal T> void foo(T.ref t) { }
+                }
+                """
+        );
+
+        assertOK(
+                """
+                class C1 {
+                    <__universal T> void foo(T.ref t) {}
+                }
+
+                class C2 extends C1 {
+                    <__universal T> void foo(T t) { }
+                }
+                """
+        );
+
+        assertOK(
+                """
+                    import java.util.function.*;
+                    class Test<__universal T> {
+                        T.ref field;
+                        void foo(T t, Consumer<? super T> action) {
+                            action.accept(field = t);
+                        }
+                    }
+                """
+        );
     }
 }
