@@ -2265,8 +2265,7 @@ public class Types {
          */
 
         if (sym.type == syms.objectType) { //optimization
-            //if (!isPrimitiveClass(t))
-                return syms.objectType;
+            return syms.objectType;
         }
         if (sym == syms.identityObjectType.tsym) {
             // IdentityObject is super interface of every concrete identity class other than jlO
@@ -2299,12 +2298,6 @@ public class Types {
             public Type visitClassType(ClassType t, Symbol sym) {
                 if (t.tsym == sym)
                     return t;
-
-                // No man may be an island, but the bell tolls for a value.
-                /*
-                 if (isPrimitiveClass(t))
-                    return null;
-                 */
 
                 Symbol c = t.tsym;
                 if (!seenTypes.add(c)) {
