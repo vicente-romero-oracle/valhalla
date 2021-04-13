@@ -231,6 +231,7 @@ class CompletenessAnalyzer {
         TRANSIENT(TokenKind.TRANSIENT, XDECL1 | XMODIFIER),  //  transient
         VOLATILE(TokenKind.VOLATILE, XDECL1 | XMODIFIER),  //  volatile
         PRIMITIVE(TokenKind.PRIMITIVE, 0),
+        UNIVERSAL(TokenKind.UNIVERSAL, XDECL1 | XMODIFIER),  //  __universal (Valhalla)
 
         // Declarations and type parameters (thus expressions)
         EXTENDS(TokenKind.EXTENDS, XEXPR|XDECL),  //  extends
