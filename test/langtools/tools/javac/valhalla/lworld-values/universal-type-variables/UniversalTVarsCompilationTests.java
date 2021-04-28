@@ -50,14 +50,6 @@ public class UniversalTVarsCompilationTests extends CompilationTestCase {
     }
 
     public void testNegCompilations() {
-        assertFail("compiler.err.var.not.initialized.in.default.constructor",
-                """
-                class Box<__universal T> {
-                    T t;
-                    void m() { t = null; }
-                }
-                """
-        );
         assertFail("compiler.err.primitive.class.does.not.support",
                 """
                 primitive class Point {}
@@ -89,7 +81,15 @@ public class UniversalTVarsCompilationTests extends CompilationTestCase {
     }
 
     public void testUniversalTVarFieldMustBeInit() {
-        assertFail("compiler.err.var.might.not.have.been.initialized",
+        assertOKWithWarning("compiler.warn.var.might.not.have.been.initialized",
+            """
+            class Box<__universal T> {
+                T t;
+                void m() { t = null; }
+            }
+            """
+        );
+        assertOKWithWarning("compiler.warn.var.might.not.have.been.initialized",
                 """
                 class Box<__universal T> {
                     T t;
