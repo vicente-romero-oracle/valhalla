@@ -48,9 +48,7 @@ import com.sun.tools.javac.comp.AttrContext;
 import com.sun.tools.javac.comp.Check;
 import com.sun.tools.javac.comp.Enter;
 import com.sun.tools.javac.comp.Env;
-import com.sun.tools.javac.comp.LambdaToMethod;
 import com.sun.tools.javac.jvm.ClassFile;
-import com.sun.tools.javac.jvm.Target;
 import com.sun.tools.javac.util.*;
 
 import static com.sun.tools.javac.code.BoundKind.*;
@@ -608,8 +606,10 @@ public class Types {
 
         boolean tValue = t.isPrimitiveClass();
         boolean sValue = s.isPrimitiveClass();
-        if ((s.hasTag(TYPEVAR)) && ((TypeVar)s).isUniversal() && t.hasTag(BOT))
-            return false;
+        if ((s.hasTag(TYPEVAR)) && ((TypeVar)s).isUniversal() && t.hasTag(BOT)) {
+            warn.warn(LintCategory.UNCHECKED);
+            return true;
+        }
         if (tValue != sValue) {
             return tValue ?
                     isSubtype(t.referenceProjection(), s) :
@@ -3503,8 +3503,8 @@ public class Types {
                 }
                 if (t.createdFromUniversalTypeVar &&
                         from.head.hasTag(TYPEVAR) &&
-                        ((TypeVar)from.head).referenceTypeVar != null &&
-                        t.equalsIgnoreMetadata(((TypeVar)from.head).referenceTypeVar)) {
+                        ((TypeVar)from.head).referenceProjection != null &&
+                        t.equalsIgnoreMetadata(((TypeVar)from.head).referenceProjection)) {
                     return to.head.withTypeVar(t);
                 }
             }
@@ -3657,11 +3657,8 @@ public class Types {
             @Override
             public TypeVar visitTypeVar(TypeVar t, Void _unused) {
                 TypeVar newTV = new TypeVar(t.tsym, t.getUpperBound(), t.getLowerBound(), t.getMetadata(), t.universal);
-                if (t.referenceTypeVar != null) {
-                    newTV.referenceTypeVar = new TypeVar(t.tsym,
-                            t.getUpperBound(), t.getLowerBound(), t.getMetadata(), false);
-                    newTV.referenceTypeVar.createdFromUniversalTypeVar = true;
-                    newTV.referenceTypeVar.universalTypeVar = newTV;
+                if (t.referenceProjection != null) {
+                    newTV.createReferenceProjection();
                 }
                 return newTV;
             }

@@ -1792,7 +1792,7 @@ public abstract class Type extends AnnoConstruct implements TypeMirror, PoolCons
          *  corresponding referenceTyepVar share the same tsym. So if it is needed to double check if
          *  a type variable is universal or not, we need to check its type not the type of its tsym
          */
-        public TypeVar referenceTypeVar = null;
+        public TypeVar referenceProjection = null;
 
         /** link back to universal type var when applicable, this field will have a value if  this current
          *  type variable was derived form a type variable declaration using the .ref suffix, once the code
@@ -1898,10 +1898,16 @@ public abstract class Type extends AnnoConstruct implements TypeMirror, PoolCons
         public Type withTypeVar(Type t) {
             if (t.hasTag(TYPEVAR) &&
                     ((TypeVar)t).createdFromUniversalTypeVar &&
-                    referenceTypeVar != null) {
-                return referenceTypeVar;
+                    referenceProjection != null) {
+                return referenceProjection;
             }
             return this;
+        }
+
+        public void createReferenceProjection() {
+            referenceProjection = new TypeVar(tsym, _bound, lower, metadata, false);
+            referenceProjection.createdFromUniversalTypeVar = true;
+            referenceProjection.universalTypeVar = this;
         }
     }
 

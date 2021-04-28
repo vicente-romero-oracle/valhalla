@@ -50,7 +50,7 @@ public class UniversalTVarsCompilationTests extends CompilationTestCase {
     }
 
     public void testNegCompilations() {
-        assertFail("compiler.err.prob.found.req",
+        assertFail("compiler.err.var.not.initialized.in.default.constructor",
                 """
                 class Box<__universal T> {
                     T t;

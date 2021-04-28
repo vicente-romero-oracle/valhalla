@@ -4447,17 +4447,13 @@ public class Attr extends JCTree.Visitor {
             case TYPEVAR:
                 if (name == names.ref && ((TypeVar)site).universal) {
                     TypeVar siteTV = (TypeVar)site;
-                    if (siteTV.referenceTypeVar == null) {
-                        siteTV.referenceTypeVar = new TypeVar(siteTV.tsym,
-                                //new TypeVariableSymbol(siteTV.tsym.flags(), siteTV.tsym.name, null, siteTV.tsym.owner),
-                                siteTV.getUpperBound(), siteTV.getLowerBound(), siteTV.getMetadata(), false);
-                        siteTV.referenceTypeVar.createdFromUniversalTypeVar = true;
-                        siteTV.referenceTypeVar.universalTypeVar = siteTV;
+                    if (siteTV.referenceProjection == null) {
+                        siteTV.createReferenceProjection();
                         TypeVariableSymbol tmpTVarSym = new TypeVariableSymbol(siteTV.tsym.flags(), siteTV.tsym.name, null, siteTV.tsym.owner);
-                        tmpTVarSym.type = siteTV.referenceTypeVar;
+                        tmpTVarSym.type = siteTV.referenceProjection;
                     }
                     TypeVariableSymbol tmpTVarSym = new TypeVariableSymbol(siteTV.tsym.flags(), siteTV.tsym.name, null, siteTV.tsym.owner);
-                    tmpTVarSym.type = siteTV.referenceTypeVar;
+                    tmpTVarSym.type = siteTV.referenceProjection;
                     return tmpTVarSym;
                 }
                 // Normally, site.getUpperBound() shouldn't be null.
