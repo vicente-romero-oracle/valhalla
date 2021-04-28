@@ -1928,6 +1928,8 @@ public abstract class Type extends AnnoConstruct implements TypeMirror, PoolCons
             this.lower = Assert.checkNonNull(lower);
             this.setUpperBound(upper);
             this.wildcard = wildcard;
+            this.universal = upper.hasTag(TYPEVAR) && ((TypeVar)upper).universal ||
+                    lower.hasTag(TYPEVAR) && ((TypeVar)lower).universal;
         }
 
         public CapturedType(TypeSymbol tsym,
@@ -1938,6 +1940,8 @@ public abstract class Type extends AnnoConstruct implements TypeMirror, PoolCons
                             TypeMetadata metadata) {
             super(tsym, bound, lower, metadata);
             this.wildcard = wildcard;
+            this.universal = upper.hasTag(TYPEVAR) && ((TypeVar)upper).universal ||
+                    lower.hasTag(TYPEVAR) && ((TypeVar)lower).universal;
         }
 
         @Override
