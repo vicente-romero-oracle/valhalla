@@ -1150,6 +1150,9 @@ public class Types {
                  case TYPEVAR:
                      return isSubtypeNoCapture(t.getUpperBound(), s);
                  case BOT:
+                     if (s.hasTag(TYPEVAR) && ((TypeVar)s).universal) {
+                         warnStack.head.warn(LintCategory.UNCHECKED);
+                     }
                      return
                          s.hasTag(BOT) || (s.hasTag(CLASS) && !isPrimitiveClass(s)) ||
                          s.hasTag(ARRAY) || s.hasTag(TYPEVAR);
