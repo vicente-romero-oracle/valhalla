@@ -126,6 +126,9 @@ public class Lint
                 values.add(LintCategory.PREVIEW);
             }
             values.add(LintCategory.SYNCHRONIZATION);
+            if (source.compareTo(Source.JDK17) >= 0) {
+                values.add(LintCategory.UNIVERSAL);
+            }
         }
 
         // Look for specific overrides
@@ -316,7 +319,12 @@ public class Lint
         /**
          * Warn about use of preview features.
          */
-        PREVIEW("preview");
+        PREVIEW("preview"),
+
+        /**
+         * Warn about use of universal type variables.
+         */
+        UNIVERSAL("universal");
 
         LintCategory(String option) {
             this(option, false);
