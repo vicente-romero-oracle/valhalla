@@ -46,6 +46,7 @@
 #include "runtime/vmThread.hpp"
 #include "utilities/ticks.hpp"
 
+class AbstractLockNode;
 class AddPNode;
 class Block;
 class Bundle;
@@ -64,6 +65,7 @@ class MachOper;
 class MachSafePointNode;
 class Node;
 class Node_Array;
+class Node_List;
 class Node_Notes;
 class NodeCloneInfo;
 class OptoReg;
@@ -90,7 +92,6 @@ class TypeVect;
 class Unique_Node_List;
 class InlineTypeBaseNode;
 class nmethod;
-class WarmCallInfo;
 class Node_Stack;
 struct Final_Reshape_Counts;
 
@@ -247,11 +248,11 @@ class Compile : public Phase {
  private:
   // Fixed parameters to this compilation.
   const int             _compile_id;
-  const bool            _save_argument_registers; // save/restore arg regs for trampolines
   const bool            _subsume_loads;         // Load can be matched as part of a larger op.
   const bool            _do_escape_analysis;    // Do escape analysis.
   const bool            _install_code;          // Install the code that was compiled
   const bool            _eliminate_boxing;      // Do boxing elimination.
+  const bool            _do_locks_coarsening;   // Do locks coarsening
   ciMethod*             _method;                // The method being compiled.
   int                   _entry_bci;             // entry bci for osr methods.
   const TypeFunc*       _tf;                    // My kind of signature
@@ -295,6 +296,7 @@ class Compile : public Phase {
   bool                  _print_inlining;        // True if we should print inlining for this compilation
   bool                  _print_intrinsics;      // True if we should print intrinsics for this compilation
 #ifndef PRODUCT
+  uint                  _igv_idx;               // Counter for IGV node identifiers
   bool                  _trace_opto_output;
   bool                  _print_ideal;
   bool                  _parsed_irreducible_loop; // True if ciTypeFlow detected irreducible loops during parsing
@@ -324,6 +326,7 @@ class Compile : public Phase {
   GrowableArray<Node*>  _expensive_nodes;       // List of nodes that are expensive to compute and that we'd better not let the GVN freely common
   GrowableArray<Node*>  _for_post_loop_igvn;    // List of nodes for IGVN after loop opts are over
   GrowableArray<Node*>  _inline_type_nodes;     // List of InlineType nodes
+  GrowableArray<Node_List*> _coarsened_locks;   // List of coarsened Lock and Unlock nodes
   ConnectionGraph*      _congraph;
 #ifndef PRODUCT
   IdealGraphPrinter*    _printer;
@@ -383,7 +386,6 @@ class Compile : public Phase {
   // Parsing, optimization
   PhaseGVN*             _initial_gvn;           // Results of parse-time PhaseGVN
   Unique_Node_List*     _for_igvn;              // Initial work-list for next round of Iterative GVN
-  WarmCallInfo*         _warm_calls;            // Sorted work-list for heat-based inlining.
 
   GrowableArray<CallGenerator*> _late_inlines;        // List of CallGenerators to be revisited after main parsing has finished.
   GrowableArray<CallGenerator*> _string_late_inlines; // same but for string operations
@@ -488,8 +490,6 @@ class Compile : public Phase {
 
   PhaseOutput*          _output;
 
-  void reshape_address(AddPNode* n);
-
  public:
   // Accessors
 
@@ -517,8 +517,9 @@ class Compile : public Phase {
   bool              eliminate_boxing() const    { return _eliminate_boxing; }
   /** Do aggressive boxing elimination. */
   bool              aggressive_unboxing() const { return _eliminate_boxing && AggressiveUnboxing; }
-  bool              save_argument_registers() const { return _save_argument_registers; }
   bool              should_install_code() const { return _install_code; }
+  /** Do locks coarsening. */
+  bool              do_locks_coarsening() const { return _do_locks_coarsening; }
 
   // Other fixed compilation parameters.
   ciMethod*         method() const              { return _method; }
@@ -616,6 +617,7 @@ class Compile : public Phase {
   }
 
 #ifndef PRODUCT
+  uint          next_igv_idx()                  { return _igv_idx++; }
   bool          trace_opto_output() const       { return _trace_opto_output; }
   bool          print_ideal() const             { return _print_ideal; }
   bool              parsed_irreducible_loop() const { return _parsed_irreducible_loop; }
@@ -675,6 +677,7 @@ class Compile : public Phase {
   int           predicate_count()         const { return _predicate_opaqs.length(); }
   int           skeleton_predicate_count() const { return _skeleton_predicate_opaqs.length(); }
   int           expensive_count()         const { return _expensive_nodes.length(); }
+  int           coarsened_count()         const { return _coarsened_locks.length(); }
 
   Node*         macro_node(int idx)       const { return _macro_nodes.at(idx); }
   Node*         predicate_opaque1_node(int idx) const { return _predicate_opaqs.at(idx); }
@@ -696,6 +699,10 @@ class Compile : public Phase {
     if (predicate_count() > 0) {
       _predicate_opaqs.remove_if_existing(n);
     }
+    // Remove from coarsened locks list if present
+    if (coarsened_count() > 0) {
+      remove_coarsened_lock(n);
+    }
   }
   void add_expensive_node(Node* n);
   void remove_expensive_node(Node* n) {
@@ -715,6 +722,10 @@ class Compile : public Phase {
       _skeleton_predicate_opaqs.remove_if_existing(n);
     }
   }
+  void add_coarsened_locks(GrowableArray<AbstractLockNode*>& locks);
+  void remove_coarsened_lock(Node* n);
+  bool coarsened_locks_consistent();
+
   bool       post_loop_opts_phase() { return _post_loop_opts_phase;  }
   void   set_post_loop_opts_phase() { _post_loop_opts_phase = true;  }
   void reset_post_loop_opts_phase() { _post_loop_opts_phase = false; }
@@ -818,7 +829,7 @@ class Compile : public Phase {
   MachConstantBaseNode*     mach_constant_base_node();
   bool                  has_mach_constant_base_node() const { return _mach_constant_base_node != NULL; }
   // Generated by adlc, true if CallNode requires MachConstantBase.
-  bool                      needs_clone_jvms();
+  bool                      needs_deep_clone_jvms();
 
   // Handy undefined Node
   Node*             top() const                 { return _top; }
@@ -903,7 +914,7 @@ class Compile : public Phase {
                                   const TypeOopPtr* receiver_type, bool is_virtual,
                                   bool &call_does_dispatch, int &vtable_index,
                                   bool check_access = true);
-  ciMethod* optimize_inlining(ciMethod* caller, ciInstanceKlass* klass,
+  ciMethod* optimize_inlining(ciMethod* caller, ciInstanceKlass* klass, ciKlass* holder,
                               ciMethod* callee, const TypeOopPtr* receiver_type,
                               bool check_access = true);
 
@@ -943,13 +954,9 @@ class Compile : public Phase {
 
   void              identify_useful_nodes(Unique_Node_List &useful);
   void              update_dead_node_list(Unique_Node_List &useful);
-  void              remove_useless_nodes (Unique_Node_List &useful);
+  void              disconnect_useless_nodes(Unique_Node_List &useful, Unique_Node_List* worklist);
 
   void              remove_useless_node(Node* dead);
-
-  WarmCallInfo*     warm_calls() const          { return _warm_calls; }
-  void          set_warm_calls(WarmCallInfo* l) { _warm_calls = l; }
-  WarmCallInfo* pop_warm_call();
 
   // Record this CallGenerator for inlining at the end of parsing.
   void              add_late_inline(CallGenerator* cg)        {
@@ -981,6 +988,8 @@ class Compile : public Phase {
 
   void remove_useless_late_inlines(GrowableArray<CallGenerator*>* inlines, Unique_Node_List &useful);
   void remove_useless_late_inlines(GrowableArray<CallGenerator*>* inlines, Node* dead);
+
+  void remove_useless_coarsened_locks(Unique_Node_List& useful);
 
   void process_print_inlining();
   void dump_print_inlining();
@@ -1048,7 +1057,8 @@ class Compile : public Phase {
   // continuation.
   Compile(ciEnv* ci_env, ciMethod* target,
           int entry_bci, bool subsume_loads, bool do_escape_analysis,
-          bool eliminate_boxing, bool install_code, DirectiveSet* directive);
+          bool eliminate_boxing, bool do_locks_coarsening,
+          bool install_code, DirectiveSet* directive);
 
   // Second major entry point.  From the TypeFunc signature, generate code
   // to pass arguments from the Java calling convention to the C calling
@@ -1056,7 +1066,7 @@ class Compile : public Phase {
   Compile(ciEnv* ci_env, const TypeFunc *(*gen)(),
           address stub_function, const char *stub_name,
           int is_fancy_jump, bool pass_tls,
-          bool save_arg_registers, bool return_pc, DirectiveSet* directive);
+          bool return_pc, DirectiveSet* directive);
 
   // Are we compiling a method?
   bool has_method() { return method() != NULL; }

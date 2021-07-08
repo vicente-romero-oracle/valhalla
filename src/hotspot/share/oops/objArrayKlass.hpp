@@ -45,8 +45,8 @@ class ObjArrayKlass : public ArrayKlass {
   Klass* _bottom_klass;             // The one-dimensional type (InstanceKlass or TypeArrayKlass)
 
   // Constructor
-  ObjArrayKlass(int n, Klass* element_klass, Symbol* name);
-  static ObjArrayKlass* allocate(ClassLoaderData* loader_data, int n, Klass* k, Symbol* name, TRAPS);
+  ObjArrayKlass(int n, Klass* element_klass, Symbol* name, bool null_free);
+  static ObjArrayKlass* allocate(ClassLoaderData* loader_data, int n, Klass* k, Symbol* name, bool null_free, TRAPS);
  public:
   // For dummy objects
   ObjArrayKlass() {}
@@ -67,7 +67,8 @@ class ObjArrayKlass : public ArrayKlass {
 
   // Allocation
   static ObjArrayKlass* allocate_objArray_klass(ClassLoaderData* loader_data,
-                                                int n, Klass* element_klass, TRAPS);
+                                                int n, Klass* element_klass,
+                                                bool null_free, bool qdesc, TRAPS);
 
   objArrayOop allocate(int length, TRAPS);
   oop multi_allocate(int rank, jint* sizes, TRAPS);
@@ -86,14 +87,14 @@ class ObjArrayKlass : public ArrayKlass {
   void do_copy(arrayOop s, size_t src_offset,
                arrayOop d, size_t dst_offset,
                int length, TRAPS);
- protected:
+ public:
   // Returns the ObjArrayKlass for n'th dimension.
-  virtual Klass* array_klass_impl(bool or_null, int n, TRAPS);
+  virtual Klass* array_klass(int n, TRAPS);
+  virtual Klass* array_klass_or_null(int n);
 
   // Returns the array class with this class as element type.
-  virtual Klass* array_klass_impl(bool or_null, TRAPS);
-
- public:
+  virtual Klass* array_klass(TRAPS);
+  virtual Klass* array_klass_or_null();
 
   static ObjArrayKlass* cast(Klass* k) {
     return const_cast<ObjArrayKlass*>(cast(const_cast<const Klass*>(k)));

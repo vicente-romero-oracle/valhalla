@@ -107,8 +107,6 @@ public class VMProps implements Callable<Map<String, String>> {
         map.put("vm.pageSize", this::vmPageSize);
         map.put("vm.rtm.cpu", this::vmRTMCPU);
         map.put("vm.rtm.compiler", this::vmRTMCompiler);
-        map.put("vm.aot", this::vmAOT);
-        map.put("vm.aot.enabled", this::vmAotEnabled);
         // vm.cds is true if the VM is compiled with cds support.
         map.put("vm.cds", this::vmCDS);
         map.put("vm.cds.custom.loaders", this::vmCDSForCustomLoaders);
@@ -313,9 +311,11 @@ public class VMProps implements Callable<Map<String, String>> {
         vmOptFinalFlag(map, "ClassUnloading");
         vmOptFinalFlag(map, "ClassUnloadingWithConcurrentMark");
         vmOptFinalFlag(map, "UseCompressedOops");
+        vmOptFinalFlag(map, "UseVectorizedMismatchIntrinsic");
         vmOptFinalFlag(map, "EnableJVMCI");
         vmOptFinalFlag(map, "EliminateAllocations");
         vmOptFinalFlag(map, "TieredCompilation");
+        vmOptFinalFlag(map, "UseVtableBasedCHA");
     }
 
     /**
@@ -330,7 +330,7 @@ public class VMProps implements Callable<Map<String, String>> {
      * support.
      */
     protected String vmHasJFR() {
-        return "" + WB.isJFRIncludedInVmBuild();
+        return "" + WB.isJFRIncluded();
     }
 
     /**
@@ -361,55 +361,12 @@ public class VMProps implements Callable<Map<String, String>> {
     }
 
     /**
-     * @return true if VM supports AOT and false otherwise
-     */
-    protected String vmAOT() {
-        if (WB.getBooleanVMFlag("EnableValhalla").booleanValue()) {
-            return "false";
-        }
-        // builds with aot have jaotc in <JDK>/bin
-        Path bin = Paths.get(System.getProperty("java.home"))
-                        .resolve("bin");
-        Path jaotc;
-        if (Platform.isWindows()) {
-            jaotc = bin.resolve("jaotc.exe");
-        } else {
-            jaotc = bin.resolve("jaotc");
-        }
-
-        if (!Files.exists(jaotc)) {
-            // No jaotc => no AOT
-            return "false";
-        }
-
-        switch (GC.selected()) {
-            case Serial:
-            case Parallel:
-            case G1:
-                // These GCs are supported with AOT
-                return "true";
-            default:
-                break;
-        }
-
-        // Every other GC is not supported
-        return "false";
-    }
-
-    /*
-     * @return true if there is at least one loaded AOT'ed library.
-     */
-    protected String vmAotEnabled() {
-        return "" + (WB.aotLibrariesCount() > 0);
-    }
-
-    /**
      * Check for CDS support.
      *
      * @return true if CDS is supported by the VM to be tested.
      */
     protected String vmCDS() {
-        return "" + WB.isCDSIncludedInVmBuild();
+        return "" + WB.isCDSIncluded();
     }
 
     /**

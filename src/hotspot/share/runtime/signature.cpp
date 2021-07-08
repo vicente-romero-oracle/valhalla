@@ -204,6 +204,12 @@ SignatureStream::SignatureStream(const Symbol* signature,
 }
 
 SignatureStream::~SignatureStream() {
+  if (_previous_name == vmSymbols::java_lang_Object()) {
+    // no names were created
+    assert(_names == NULL, "_names unexpectedly created");
+    return;
+  }
+
   // decrement refcount for names created during signature parsing
   _previous_name->decrement_refcount();
   if (_names != NULL) {
@@ -383,7 +389,7 @@ Symbol* SignatureStream::find_symbol() {
 }
 
 InlineKlass* SignatureStream::as_inline_klass(InstanceKlass* holder) {
-  Thread* THREAD = Thread::current();
+  JavaThread* THREAD = Thread::current()->as_Java_thread();
   Handle class_loader(THREAD, holder->class_loader());
   Handle protection_domain(THREAD, holder->protection_domain());
   Klass* k = as_klass(class_loader, protection_domain, SignatureStream::ReturnNull, THREAD);
@@ -430,7 +436,8 @@ oop SignatureStream::as_java_mirror(Handle class_loader, Handle protection_domai
   if (klass == NULL) {
     return NULL;
   }
-  return klass->java_mirror();
+  return has_Q_descriptor() ? InlineKlass::cast(klass)->val_mirror()
+                            : klass->java_mirror();
 }
 
 void SignatureStream::skip_to_return_type() {

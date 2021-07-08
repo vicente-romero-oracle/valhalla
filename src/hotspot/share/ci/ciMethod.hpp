@@ -205,6 +205,15 @@ class ciMethod : public ciMetadata {
   bool intrinsic_candidate()   const { return get_Method()->intrinsic_candidate();   }
   bool is_class_initializer()  const { return get_Method()->is_class_initializer(); }
 
+  bool check_intrinsic_candidate() const {
+    if (intrinsic_id() == vmIntrinsics::_blackhole) {
+      // This is the intrinsic without an associated method, so no intrinsic_candidate
+      // flag is set. The intrinsic is still correct.
+      return true;
+    }
+    return (CheckIntrinsics ? intrinsic_candidate() : true);
+  }
+
   int highest_osr_comp_level();
 
   Bytecodes::Code java_code_at_bci(int bci) {
@@ -295,7 +304,7 @@ class ciMethod : public ciMetadata {
 
   // Given a known receiver klass, find the target for the call.
   // Return NULL if the call has no target or is abstract.
-  ciMethod* resolve_invoke(ciKlass* caller, ciKlass* exact_receiver, bool check_access = true);
+  ciMethod* resolve_invoke(ciKlass* caller, ciKlass* exact_receiver, bool check_access = true, bool allow_abstract = false);
 
   // Find the proper vtable index to invoke this method.
   int resolve_vtable_index(ciKlass* caller, ciKlass* receiver);
@@ -337,7 +346,6 @@ class ciMethod : public ciMetadata {
   bool is_native      () const                   { return flags().is_native(); }
   bool is_interface   () const                   { return flags().is_interface(); }
   bool is_abstract    () const                   { return flags().is_abstract(); }
-  bool is_strict      () const                   { return flags().is_strict(); }
   bool has_vararg     () const                   { return flags().has_vararg(); }
 
   // Other flags
@@ -350,6 +358,7 @@ class ciMethod : public ciMetadata {
   bool is_getter      () const;
   bool is_setter      () const;
   bool is_accessor    () const;
+  bool is_empty       () const;
   bool can_be_statically_bound() const           { return _can_be_statically_bound; }
   bool has_reserved_stack_access() const         { return _has_reserved_stack_access; }
   bool is_boxing_method() const;

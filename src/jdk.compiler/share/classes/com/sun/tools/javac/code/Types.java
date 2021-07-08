@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collector;
 
 import javax.tools.JavaFileObject;
@@ -272,7 +273,7 @@ public class Types {
                     formals = formals.tail;
                 }
                 if (outer1 == outer && !changed) return t;
-                else return new ClassType(outer1, typarams1.toList(), t.tsym, t.getMetadata(), t.isReferenceProjection()) {
+                else return new ClassType(outer1, typarams1.toList(), t.tsym, t.getMetadata(), t.getFlavor()) {
                     @Override
                     protected boolean needsStripping() {
                         return true;
@@ -959,14 +960,17 @@ public class Types {
         return overridden.toList();
     }
     //where
-        private Filter<Symbol> bridgeFilter = new Filter<Symbol>() {
-            public boolean accepts(Symbol t) {
+        // Use anonymous class instead of lambda expression intentionally,
+        // because the variable `names` has modifier: final.
+        private Predicate<Symbol> bridgeFilter = new Predicate<Symbol>() {
+            public boolean test(Symbol t) {
                 return t.kind == MTH &&
                         t.name != names.init &&
                         t.name != names.clinit &&
                         (t.flags() & SYNTHETIC) == 0;
             }
         };
+
         private boolean pendingBridges(ClassSymbol origin, TypeSymbol s) {
             //a symbol will be completed from a classfile if (a) symbol has
             //an associated file object with CLASS kind and (b) the symbol has
@@ -992,7 +996,7 @@ public class Types {
     * Scope filter used to skip methods that should be ignored (such as methods
     * overridden by j.l.Object) during function interface conversion interface check
     */
-    class DescriptorFilter implements Filter<Symbol> {
+    class DescriptorFilter implements Predicate<Symbol> {
 
        TypeSymbol origin;
 
@@ -1001,7 +1005,7 @@ public class Types {
        }
 
        @Override
-       public boolean accepts(Symbol sym) {
+       public boolean test(Symbol sym) {
            return sym.kind == MTH &&
                    (sym.flags() & (ABSTRACT | DEFAULT)) == ABSTRACT &&
                    !overridesObjectMethod(origin, sym) &&
@@ -1010,7 +1014,7 @@ public class Types {
     }
 
     public boolean isPrimitiveClass(Type t) {
-        return t != null && !t.isReferenceProjection() && t.tsym != null && (t.tsym.flags_field & Flags.PRIMITIVE_CLASS) != 0;
+        return t != null && t.isPrimitiveClass();
     }
 
     // <editor-fold defaultstate="collapsed" desc="isSubtype">
@@ -1641,7 +1645,7 @@ public class Types {
 
                     // -----------------------------------  Unspecified behavior ----------------
 
-                    /* If a value class V implements an interface I, then does "? extends I" contain V?
+                    /* If a primitive class V implements an interface I, then does "? extends I" contain V?
                        It seems widening must be applied here to answer yes to compile some common code
                        patterns.
                     */
@@ -1886,7 +1890,7 @@ public class Types {
                     // Sidecast
                     if (s.hasTag(CLASS)) {
                         if ((s.tsym.flags() & INTERFACE) != 0) {
-                            return (dynamicTypeMayImplementAdditionalInterfaces(t.tsym))
+                            return ((t.tsym.flags() & FINAL) == 0)
                                 ? sideCast(t, s, warnStack.head)
                                 : sideCastFinal(t, s, warnStack.head);
                         } else if ((t.tsym.flags() & INTERFACE) != 0) {
@@ -2267,20 +2271,28 @@ public class Types {
          *     Iterable<capture#160 of ? extends c.s.s.d.DocTree>
          */
 
+        if (isPrimitiveClass(t)) {
+            // No man may be an island, but the bell tolls for a value.
+            return t.tsym == sym ? t : null;
+        }
+
         if (sym.type == syms.objectType) { //optimization
             return syms.objectType;
         }
         if (sym == syms.identityObjectType.tsym) {
-            // IdentityObject is super interface of every concrete identity class other than jlO
-            if (t.isPrimitiveClass() || t.tsym == syms.objectType.tsym)
+            // IdentityObject is a super interface of every concrete identity class other than jlO
+            if (t.tsym == syms.objectType.tsym)
                 return null;
             if (t.hasTag(ARRAY))
                 return syms.identityObjectType;
             if (t.hasTag(CLASS) && !t.isReferenceProjection() && !t.tsym.isInterface() && !t.tsym.isAbstract()) {
                 return syms.identityObjectType;
+            }
+            if (implicitIdentityType(t)) {
+                return syms.identityObjectType;
             } // else fall through and look for explicit coded super interface
         } else if (sym == syms.primitiveObjectType.tsym) {
-            if (t.isPrimitiveClass() || t.isReferenceProjection())
+            if (t.isReferenceProjection())
                 return syms.primitiveObjectType;
             if (t.hasTag(ARRAY) || t.tsym == syms.objectType.tsym)
                 return null;
@@ -2346,6 +2358,63 @@ public class Types {
                 return t;
             }
         };
+
+        // where
+        private boolean implicitIdentityType(Type t) {
+            /* An abstract class can be declared to implement either IdentityObject or PrimitiveObject;
+             * or, if it declares a field, an instance initializer, a non-empty constructor, or
+             * a synchronized method, it implicitly implements IdentityObject.
+             */
+            if (!t.tsym.isAbstract())
+                return false;
+
+            for (; t != Type.noType; t = supertype(t)) {
+
+                if (t == null || t.tsym == null || t.tsym.kind == ERR)
+                    return false;
+
+                if  (t.tsym == syms.objectType.tsym)
+                    return false;
+
+                if (!t.tsym.isAbstract()) {
+                    return !t.tsym.isPrimitiveClass();
+                }
+
+                if ((t.tsym.flags() & HASINITBLOCK) != 0) {
+                    return true;
+                }
+
+                // No instance fields and no arged constructors both mean inner classes cannot be primitive class supers.
+                Type encl = t.getEnclosingType();
+                if (encl != null && encl.hasTag(CLASS)) {
+                    return true;
+                }
+                for (Symbol s : t.tsym.members().getSymbols(NON_RECURSIVE)) {
+                    switch (s.kind) {
+                        case VAR:
+                            if ((s.flags() & STATIC) == 0) {
+                                return true;
+                            }
+                            break;
+                        case MTH:
+                            if ((s.flags() & SYNCHRONIZED) != 0) {
+                                return true;
+                            } else if (s.isConstructor()) {
+                                MethodSymbol m = (MethodSymbol)s;
+                                if (m.getParameters().size() > 0) {
+                                    return true;
+                                } else {
+                                    if ((m.flags() & (GENERATEDCONSTR | EMPTYNOARGCONSTR)) == 0) {
+                                        return true;
+                                    }
+                                }
+                            }
+                            break;
+                    }
+                }
+            }
+            return false;
+        }
 
     /**
      * Return the base type of t or any of its outer types that starts
@@ -2417,7 +2486,7 @@ public class Types {
         if ((sym.flags() & STATIC) != 0)
             return sym.type;
 
-        /* If any inline types are involved, switch over to the reference universe,
+        /* If any primitive class types are involved, switch over to the reference universe,
            where the hierarchy is navigable. V and V.ref have identical membership
            with no bridging needs.
         */
@@ -2579,10 +2648,10 @@ public class Types {
             public Type visitClassType(ClassType t, Boolean recurse) {
                 // erasure(projection(primitive)) = projection(erasure(primitive))
                 Type erased = eraseClassType(t, recurse);
-                if (t.isReferenceProjection()) {
+                if (erased.hasTag(CLASS) && t.flavor != erased.getFlavor()) {
                     erased = new ClassType(erased.getEnclosingType(),
                             List.nil(), erased.tsym,
-                            erased.getMetadata(), true);
+                            erased.getMetadata(), t.flavor);
                 }
                 return erased;
             }
@@ -2646,8 +2715,6 @@ public class Types {
             bounds = bounds.prepend(syms.objectType);
         }
         long flags = ABSTRACT | PUBLIC | SYNTHETIC | COMPOUND | ACYCLIC;
-        if (isPrimitiveClass(bounds.head))
-            flags |= PRIMITIVE_CLASS;
         ClassSymbol bc =
             new ClassSymbol(flags,
                             Type.moreInfo
@@ -2919,7 +2986,7 @@ public class Types {
                 Type outer1 = classBound(t.getEnclosingType());
                 if (outer1 != t.getEnclosingType())
                     return new ClassType(outer1, t.getTypeArguments(), t.tsym,
-                                         t.getMetadata(), t.isReferenceProjection());
+                                         t.getMetadata(), t.getFlavor());
                 else
                     return t;
             }
@@ -3090,12 +3157,12 @@ public class Types {
 
         class Entry {
             final MethodSymbol cachedImpl;
-            final Filter<Symbol> implFilter;
+            final Predicate<Symbol> implFilter;
             final boolean checkResult;
             final int prevMark;
 
             public Entry(MethodSymbol cachedImpl,
-                    Filter<Symbol> scopeFilter,
+                    Predicate<Symbol> scopeFilter,
                     boolean checkResult,
                     int prevMark) {
                 this.cachedImpl = cachedImpl;
@@ -3104,14 +3171,14 @@ public class Types {
                 this.prevMark = prevMark;
             }
 
-            boolean matches(Filter<Symbol> scopeFilter, boolean checkResult, int mark) {
+            boolean matches(Predicate<Symbol> scopeFilter, boolean checkResult, int mark) {
                 return this.implFilter == scopeFilter &&
                         this.checkResult == checkResult &&
                         this.prevMark == mark;
             }
         }
 
-        MethodSymbol get(MethodSymbol ms, TypeSymbol origin, boolean checkResult, Filter<Symbol> implFilter) {
+        MethodSymbol get(MethodSymbol ms, TypeSymbol origin, boolean checkResult, Predicate<Symbol> implFilter) {
             SoftReference<Map<TypeSymbol, Entry>> ref_cache = _map.get(ms);
             Map<TypeSymbol, Entry> cache = ref_cache != null ? ref_cache.get() : null;
             if (cache == null) {
@@ -3131,7 +3198,7 @@ public class Types {
             }
         }
 
-        private MethodSymbol implementationInternal(MethodSymbol ms, TypeSymbol origin, boolean checkResult, Filter<Symbol> implFilter) {
+        private MethodSymbol implementationInternal(MethodSymbol ms, TypeSymbol origin, boolean checkResult, Predicate<Symbol> implFilter) {
             for (Type t = origin.type; t.hasTag(CLASS) || t.hasTag(TYPEVAR); t = supertype(t)) {
                 t = skipTypeVars(t, false);
                 TypeSymbol c = t.tsym;
@@ -3156,7 +3223,7 @@ public class Types {
 
     private ImplementationCache implCache = new ImplementationCache();
 
-    public MethodSymbol implementation(MethodSymbol ms, TypeSymbol origin, boolean checkResult, Filter<Symbol> implFilter) {
+    public MethodSymbol implementation(MethodSymbol ms, TypeSymbol origin, boolean checkResult, Predicate<Symbol> implFilter) {
         return implCache.get(ms, origin, checkResult, implFilter);
     }
     // </editor-fold>
@@ -3177,17 +3244,17 @@ public class Types {
                 this.scope = scope;
             }
 
-            Filter<Symbol> combine(Filter<Symbol> sf) {
-                return s -> !s.owner.isInterface() && (sf == null || sf.accepts(s));
+            Predicate<Symbol> combine(Predicate<Symbol> sf) {
+                return s -> !s.owner.isInterface() && (sf == null || sf.test(s));
             }
 
             @Override
-            public Iterable<Symbol> getSymbols(Filter<Symbol> sf, LookupKind lookupKind) {
+            public Iterable<Symbol> getSymbols(Predicate<Symbol> sf, LookupKind lookupKind) {
                 return scope.getSymbols(combine(sf), lookupKind);
             }
 
             @Override
-            public Iterable<Symbol> getSymbolsByName(Name name, Filter<Symbol> sf, LookupKind lookupKind) {
+            public Iterable<Symbol> getSymbolsByName(Name name, Predicate<Symbol> sf, LookupKind lookupKind) {
                 return scope.getSymbolsByName(name, combine(sf), lookupKind);
             }
 
@@ -3317,12 +3384,9 @@ public class Types {
 
             @Override
             public boolean equals(Object obj) {
-                if (obj instanceof Entry) {
-                    Entry e = (Entry)obj;
-                    return e.msym == msym && isSameType(site, e.site);
-                } else {
-                    return false;
-                }
+                return (obj instanceof Entry entry)
+                        && entry.msym == msym
+                        && isSameType(site, entry.site);
             }
 
             @Override
@@ -3347,7 +3411,7 @@ public class Types {
         CandidatesCache.Entry e = candidatesCache.new Entry(site, ms);
         List<MethodSymbol> candidates = candidatesCache.get(e);
         if (candidates == null) {
-            Filter<Symbol> filter = new MethodFilter(ms, site);
+            Predicate<Symbol> filter = new MethodFilter(ms, site);
             List<MethodSymbol> candidates2 = List.nil();
             for (Symbol s : membersClosure(site, false).getSymbols(filter)) {
                 if (!site.tsym.isInterface() && !s.owner.isInterface()) {
@@ -3380,7 +3444,7 @@ public class Types {
         return methodsMin.toList();
     }
     // where
-            private class MethodFilter implements Filter<Symbol> {
+            private class MethodFilter implements Predicate<Symbol> {
 
                 Symbol msym;
                 Type site;
@@ -3390,7 +3454,8 @@ public class Types {
                     this.site = site;
                 }
 
-                public boolean accepts(Symbol s) {
+                @Override
+                public boolean test(Symbol s) {
                     return s.kind == MTH &&
                             s.name == msym.name &&
                             (s.flags() & SYNTHETIC) == 0 &&
@@ -4015,11 +4080,9 @@ public class Types {
             }
             @Override
             public boolean equals(Object obj) {
-                if (!(obj instanceof TypePair))
-                    return false;
-                TypePair typePair = (TypePair)obj;
-                return isSameType(t1, typePair.t1)
-                    && isSameType(t2, typePair.t2);
+                return (obj instanceof TypePair typePair)
+                        && isSameType(t1, typePair.t1)
+                        && isSameType(t2, typePair.t2);
             }
         }
         Set<TypePair> mergeCache = new HashSet<>();
@@ -4060,7 +4123,7 @@ public class Types {
             // There is no spec detailing how type annotations are to
             // be inherited.  So set it to noAnnotations for now
             return new ClassType(class1.getEnclosingType(), merged.toList(),
-                                 class1.tsym);
+                                 class1.tsym, TypeMetadata.EMPTY, class1.getFlavor());
         }
 
     /**
@@ -4488,6 +4551,8 @@ public class Types {
      * Return the primitive type corresponding to a boxed type.
      */
     public Type unboxedType(Type t) {
+        if (t.hasTag(ERROR))
+            return Type.noType;
         for (int i=0; i<syms.boxedName.length; i++) {
             Name box = syms.boxedName[i];
             if (box != null &&
@@ -4617,7 +4682,7 @@ public class Types {
 
         if (captured)
             return new ClassType(cls.getEnclosingType(), S, cls.tsym,
-                                 cls.getMetadata(), cls.isReferenceProjection());
+                                 cls.getMetadata(), cls.getFlavor());
         else
             return t;
     }
@@ -4687,7 +4752,7 @@ public class Types {
             to = from;
             from = target;
         }
-        Assert.check(!dynamicTypeMayImplementAdditionalInterfaces(from.tsym));
+        Assert.check((from.tsym.flags() & FINAL) != 0);
         Type t1 = asSuper(from, to.tsym);
         if (t1 == null) return false;
         Type t2 = to;
@@ -4697,10 +4762,6 @@ public class Types {
             (reverse ? giveWarning(t2, t1) : giveWarning(t1, t2)))
             warn.warn(LintCategory.UNCHECKED);
         return true;
-    }
-
-    private boolean dynamicTypeMayImplementAdditionalInterfaces(TypeSymbol tsym) {
-        return (tsym.flags() & FINAL) == 0 && !tsym.isReferenceProjection();
     }
 
     private boolean giveWarning(Type from, Type to) {
@@ -5049,8 +5110,8 @@ public class Types {
         }
 
         public boolean equals(Object obj) {
-            return (obj instanceof UniqueType) &&
-                types.isSameType(type, ((UniqueType)obj).type);
+            return (obj instanceof UniqueType uniqueType) &&
+                    types.isSameType(type, uniqueType.type);
         }
 
         public boolean encodeTypeSig() {
@@ -5208,8 +5269,8 @@ public class Types {
         Attribute.Compound c = sym.attribute(syms.retentionType.tsym);
         if (c != null) {
             Attribute value = c.member(names.value);
-            if (value != null && value instanceof Attribute.Enum) {
-                Name levelName = ((Attribute.Enum)value).value.name;
+            if (value != null && value instanceof Attribute.Enum attributeEnum) {
+                Name levelName = attributeEnum.value.name;
                 if (levelName == names.SOURCE) vis = RetentionPolicy.SOURCE;
                 else if (levelName == names.CLASS) vis = RetentionPolicy.CLASS;
                 else if (levelName == names.RUNTIME) vis = RetentionPolicy.RUNTIME;
@@ -5380,10 +5441,6 @@ public class Types {
                         : c.name);
             } else {
                 append(externalize(c.flatname));
-            }
-            if (ct.isReferenceProjection()) {
-                append('$');
-                append(types.names.ref);
             }
             if (ct.getTypeArguments().nonEmpty()) {
                 append('<');

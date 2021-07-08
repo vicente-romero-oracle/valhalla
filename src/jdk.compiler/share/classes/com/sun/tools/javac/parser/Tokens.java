@@ -27,6 +27,7 @@ package com.sun.tools.javac.parser;
 
 import java.util.HashMap;
 import java.util.Locale;
+import java.util.function.Predicate;
 import java.util.Map;
 
 import com.sun.tools.javac.api.Formattable;
@@ -90,7 +91,7 @@ public class Tokens {
      * This enum defines all tokens used by the javac scanner. A token is
      * optionally associated with a name.
      */
-    public enum TokenKind implements Formattable, Filter<TokenKind> {
+    public enum TokenKind implements Formattable, Predicate<TokenKind> {
         EOF(),
         ERROR(),
         IDENTIFIER(Tag.NAMED),
@@ -141,7 +142,6 @@ public class Tokens {
         THROWS("throws"),
         TRANSIENT("transient"),
         TRY("try"),
-        PRIMITIVE(), // a phantom token never returned by the scanner, but can result from a reclassification by the parser.
         VOID("void", Tag.NAMED),
         VOLATILE("volatile"),
         WHILE("while"),
@@ -247,8 +247,6 @@ public class Tokens {
                 return "token.double";
             case ERROR:
                 return "token.bad-symbol";
-            case PRIMITIVE:
-                return "primitive";
             case EOF:
                 return "token.end-of-input";
             case DOT: case COMMA: case SEMI: case LPAREN: case RPAREN:
@@ -268,7 +266,7 @@ public class Tokens {
         }
 
         @Override
-        public boolean accepts(TokenKind that) {
+        public boolean test(TokenKind that) {
             return this == that;
         }
     }

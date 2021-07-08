@@ -44,6 +44,7 @@ import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
 
 import com.sun.tools.javac.code.Source.Feature;
+import com.sun.tools.javac.code.Type.ClassType.Flavor;
 import com.sun.tools.javac.comp.Annotate;
 import com.sun.tools.javac.comp.Annotate.AnnotationTypeCompleter;
 import com.sun.tools.javac.code.*;
@@ -199,6 +200,11 @@ public class ClassReader {
     int[] parameterNameIndices;
 
     /**
+     * A table to hold the access flags of the method parameters.
+     */
+    int[] parameterAccessFlags;
+
+    /**
      * A table to hold annotations for method parameters.
      */
     ParameterAnnotations[] parameterAnnotations;
@@ -278,8 +284,7 @@ public class ClassReader {
         allowModules     = Feature.MODULES.allowedInSource(source);
         allowPrimitiveClasses = Feature.PRIMITIVE_CLASSES.allowedInSource(source);
         allowRecords = Feature.RECORDS.allowedInSource(source);
-        allowSealedTypes = (!preview.isPreview(Feature.SEALED_CLASSES) || preview.isEnabled()) &&
-                Feature.SEALED_CLASSES.allowedInSource(source);
+        allowSealedTypes = Feature.SEALED_CLASSES.allowedInSource(source);
 
         saveParameterNames = options.isSet(PARAMETERS);
 
@@ -535,13 +540,14 @@ public class ClassReader {
     /** Convert class signature to type, where signature is implicit.
      */
     Type classSigToType() {
-        if (signature[sigp] != 'L' && signature[sigp] != 'Q')
+        byte prefix = signature[sigp];
+        if (prefix != 'L' && prefix != 'Q')
             throw badClassFile("bad.class.signature",
                                Convert.utf2string(signature, sigp, 10));
         sigp++;
         Type outer = Type.noType;
         Name name;
-        boolean requireProjection;
+        ClassType.Flavor flavor;
         int startSbp = sbp;
 
         while (true) {
@@ -549,43 +555,37 @@ public class ClassReader {
             switch (c) {
 
             case ';': {         // end
-                name = names.fromUtf(signatureBuffer,
-                        startSbp,
-                        sbp - startSbp);
-                if (allowPrimitiveClasses && name.toString().endsWith("$ref")) {
-                    name = name.subName(0, name.length() - 4);
-                    requireProjection = true;
-                } else {
-                    requireProjection = false;
-                }
-                ClassSymbol t = enterClass(name);
+                ClassSymbol t = enterClass(names.fromUtf(signatureBuffer,
+                                                         startSbp,
+                                                         sbp - startSbp));
+
+                // We are seeing QFoo; or LFoo; The name itself does not shine any light on default val-refness
+                flavor = prefix == 'L' ? Flavor.L_TypeOf_X : Flavor.Q_TypeOf_X;
                 try {
-                    return (outer == Type.noType) ?
-                            requireProjection ? t.erasure(types).referenceProjection() : t.erasure(types) :
-                        new ClassType(outer, List.nil(), t, TypeMetadata.EMPTY, requireProjection);
+                    if (outer == Type.noType) {
+                        ClassType et = (ClassType) t.erasure(types);
+                        // Todo: This spews out more objects than before, i.e no reuse with identical flavor
+                        return new ClassType(et.getEnclosingType(), List.nil(), et.tsym, et.getMetadata(), flavor);
+                    }
+                    return new ClassType(outer, List.nil(), t, TypeMetadata.EMPTY, flavor);
                 } finally {
                     sbp = startSbp;
                 }
             }
 
             case '<':           // generic arguments
-                name = names.fromUtf(signatureBuffer,
-                        startSbp,
-                        sbp - startSbp);
-                if (allowPrimitiveClasses && name.toString().endsWith("$ref")) {
-                    name = name.subName(0, name.length() - 4);
-                    requireProjection = true;
-                } else {
-                    requireProjection = false;
-                }
-                ClassSymbol t = enterClass(name);
-                outer = new ClassType(outer, sigToTypes('>'), t, TypeMetadata.EMPTY, requireProjection) {
+                ClassSymbol t = enterClass(names.fromUtf(signatureBuffer,
+                                                         startSbp,
+                                                         sbp - startSbp));
+                // We are seeing QFoo; or LFoo; The name itself does not shine any light on default val-refness
+                flavor = prefix == 'L' ? Flavor.L_TypeOf_X : Flavor.Q_TypeOf_X;
+                outer = new ClassType(outer, sigToTypes('>'), t, TypeMetadata.EMPTY, flavor) {
                         boolean completed = false;
                         @Override @DefinedBy(Api.LANGUAGE_MODEL)
                         public Type getEnclosingType() {
                             if (!completed) {
                                 completed = true;
-                                tsym.complete();
+                                tsym.apiComplete();
                                 Type enclosingType = tsym.type.getEnclosingType();
                                 if (enclosingType != Type.noType) {
                                     List<Type> typeArgs =
@@ -639,17 +639,12 @@ public class ClassReader {
             case '.':
                 //we have seen an enclosing non-generic class
                 if (outer != Type.noType) {
-                    name = names.fromUtf(signatureBuffer,
-                            startSbp,
-                            sbp - startSbp);
-                    if (allowPrimitiveClasses && name.toString().endsWith("$ref")) {
-                        name = name.subName(0, name.length() - 4);
-                        requireProjection = true;
-                    } else {
-                        requireProjection = false;
-                    }
-                    t = enterClass(name);
-                    outer = new ClassType(outer, List.nil(), t, TypeMetadata.EMPTY, requireProjection);
+                    t = enterClass(names.fromUtf(signatureBuffer,
+                                                 startSbp,
+                                                 sbp - startSbp));
+                    // We are seeing QFoo; or LFoo; The name itself does not shine any light on default val-refness
+                    flavor = prefix == 'L' ? Flavor.L_TypeOf_X : Flavor.Q_TypeOf_X;
+                    outer = new ClassType(outer, List.nil(), t, TypeMetadata.EMPTY, flavor);
                 }
                 signatureBuffer[sbp++] = (byte)'$';
                 continue;
@@ -868,7 +863,7 @@ public class ClassReader {
                            // ignore ConstantValue attribute if type is not primitive or String
                            return;
                     }
-                    if (v instanceof Integer && !var.type.getTag().checkRange((Integer) v)) {
+                    if (v instanceof Integer intVal && !var.type.getTag().checkRange(intVal)) {
                         throw badClassFile("bad.constant.range", v, var, var.type);
                     }
                     var.setData(v);
@@ -1101,6 +1096,7 @@ public class ClassReader {
                         sawMethodParameters = true;
                         int numEntries = nextByte();
                         parameterNameIndices = new int[numEntries];
+                        parameterAccessFlags = new int[numEntries];
                         haveParameterNameIndices = true;
                         int index = 0;
                         for (int i = 0; i < numEntries; i++) {
@@ -1109,7 +1105,9 @@ public class ClassReader {
                             if ((flags & (Flags.MANDATED | Flags.SYNTHETIC)) != 0) {
                                 continue;
                             }
-                            parameterNameIndices[index++] = nameIndex;
+                            parameterNameIndices[index] = nameIndex;
+                            parameterAccessFlags[index] = flags;
+                            index++;
                         }
                     }
                     bp = newbp;
@@ -1474,9 +1472,8 @@ public class ClassReader {
             else if (proxy.type.tsym.flatName() == syms.profileType.tsym.flatName()) {
                 if (profile != Profile.DEFAULT) {
                     for (Pair<Name, Attribute> v : proxy.values) {
-                        if (v.fst == names.value && v.snd instanceof Attribute.Constant) {
-                            Attribute.Constant c = (Attribute.Constant)v.snd;
-                            if (c.type == syms.intType && ((Integer)c.value) > profile.value) {
+                        if (v.fst == names.value && v.snd instanceof Attribute.Constant constant) {
+                            if (constant.type == syms.intType && ((Integer) constant.value) > profile.value) {
                                 sym.flags_field |= NOT_IN_PROFILE;
                             }
                         }
@@ -1505,9 +1502,8 @@ public class ClassReader {
     //where:
         private void setFlagIfAttributeTrue(CompoundAnnotationProxy proxy, Symbol sym, Name attribute, long flag) {
             for (Pair<Name, Attribute> v : proxy.values) {
-                if (v.fst == attribute && v.snd instanceof Attribute.Constant) {
-                    Attribute.Constant c = (Attribute.Constant)v.snd;
-                    if (c.type == syms.booleanType && ((Integer)c.value) != 0) {
+                if (v.fst == attribute && v.snd instanceof Attribute.Constant constant) {
+                    if (constant.type == syms.booleanType && ((Integer) constant.value) != 0) {
                         sym.flags_field |= flag;
                     }
                 }
@@ -1560,9 +1556,6 @@ public class ClassReader {
     }
 
     Type readTypeOrClassSymbol(int i) {
-        // support preliminary jsr175-format class files
-        if (poolReader.hasTag(i, CONSTANT_Class))
-            return poolReader.getClass(i).type;
         return readTypeToProxy(i);
     }
     Type readTypeToProxy(int i) {
@@ -2099,12 +2092,12 @@ public class ClassReader {
         }
 
         Type resolvePossibleProxyType(Type t) {
-            if (t instanceof ProxyType) {
+            if (t instanceof ProxyType proxyType) {
                 Assert.check(requestingOwner.owner.kind == MDL);
                 ModuleSymbol prevCurrentModule = currentModule;
                 currentModule = (ModuleSymbol) requestingOwner.owner;
                 try {
-                    return ((ProxyType) t).resolve();
+                    return proxyType.resolve();
                 } finally {
                     currentModule = prevCurrentModule;
                 }
@@ -2173,9 +2166,8 @@ public class ClassReader {
                     if (attr.type.tsym == syms.deprecatedType.tsym) {
                         sym.flags_field |= (DEPRECATED | DEPRECATED_ANNOTATION);
                         Attribute forRemoval = attr.member(names.forRemoval);
-                        if (forRemoval instanceof Attribute.Constant) {
-                            Attribute.Constant c = (Attribute.Constant) forRemoval;
-                            if (c.type == syms.booleanType && ((Integer) c.value) != 0) {
+                        if (forRemoval instanceof Attribute.Constant constant) {
+                            if (constant.type == syms.booleanType && ((Integer) constant.value) != 0) {
                                 sym.flags_field |= DEPRECATED_REMOVAL;
                             }
                         }
@@ -2435,6 +2427,7 @@ public class ClassReader {
         sym.params = params.toList();
         parameterAnnotations = null;
         parameterNameIndices = null;
+        parameterAccessFlags = null;
     }
 
 
@@ -2444,6 +2437,10 @@ public class ClassReader {
     private VarSymbol parameter(int index, Type t, MethodSymbol owner, Set<Name> exclude) {
         long flags = PARAMETER;
         Name argName;
+        if (parameterAccessFlags != null && index < parameterAccessFlags.length
+                && parameterAccessFlags[index] != 0) {
+            flags |= parameterAccessFlags[index];
+        }
         if (parameterNameIndices != null && index < parameterNameIndices.length
                 && parameterNameIndices[index] != 0) {
             argName = optPoolEntry(parameterNameIndices[index], poolReader::getName, names.empty);
@@ -2593,8 +2590,21 @@ public class ClassReader {
         for (int i = 0; i < fieldCount; i++) enterMember(c, readField());
         Assert.check(methodCount == nextChar());
         for (int i = 0; i < methodCount; i++) enterMember(c, readMethod());
-
+        if (c.isRecord()) {
+            for (RecordComponent rc: c.getRecordComponents()) {
+                rc.accessor = lookupMethod(c, rc.name, List.nil());
+            }
+        }
         typevars = typevars.leave();
+    }
+
+    private MethodSymbol lookupMethod(TypeSymbol tsym, Name name, List<Type> argtypes) {
+        for (Symbol s : tsym.members().getSymbolsByName(name, s -> s.kind == MTH)) {
+            if (types.isSameTypes(s.type.getParameterTypes(), argtypes)) {
+                return (MethodSymbol) s;
+            }
+        }
+        return null;
     }
 
     /** Read inner class info. For each inner/outer pair allocate a
@@ -2678,7 +2688,7 @@ public class ClassReader {
             /* http://cr.openjdk.java.net/~briangoetz/valhalla/sov/04-translation.html
                The relationship of value and reference projections differs between the language model
                and the VM model. In the language, the value projection is not a subtype of the
-               reference projection; instead, the two are related by inline narrowing and widening
+               reference projection; instead, the two are related by primitive reference and value
                conversions, whereas in the VM, the two are related by actual subtyping.
                Sever the subtyping relationship by rewiring the supertypes here and now.
              */
@@ -2687,7 +2697,7 @@ public class ClassReader {
             ClassSymbol referenceProjection = syms.getClass(currentModule, flatname);
             if (referenceProjection != null) {
                 if (referenceProjection.name != names.ref && referenceProjection.owner.kind == PCK) {
-                    readClassFileInternal(referenceProjection);
+                    referenceProjection.complete();
                     ClassType classType = (ClassType) c.type;
                     classType.supertype_field = ((ClassType) referenceProjection.type).supertype_field;
                     classType.interfaces_field = ((ClassType) referenceProjection.type).interfaces_field;
@@ -2898,12 +2908,8 @@ public class ClassReader {
         public boolean equals(Object other) {
             if (this == other)
                 return true;
-
-            if (!(other instanceof SourceFileObject))
-                return false;
-
-            SourceFileObject o = (SourceFileObject) other;
-            return name.equals(o.name);
+            return (other instanceof SourceFileObject sourceFileObject)
+                    && name.equals(sourceFileObject.name);
         }
 
         @Override

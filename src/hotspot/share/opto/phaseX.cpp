@@ -407,10 +407,8 @@ void NodeHash::operator=(const NodeHash& nh) {
 //------------------------------PhaseRemoveUseless-----------------------------
 // 1) Use a breadthfirst walk to collect useful nodes reachable from root.
 PhaseRemoveUseless::PhaseRemoveUseless(PhaseGVN* gvn, Unique_Node_List* worklist, PhaseNumber phase_num) : Phase(phase_num) {
-
-  // Implementation requires 'UseLoopSafepoints == true' and an edge from root
-  // to each SafePointNode at a backward branch.  Inserted in add_safepoint().
-  if( !UseLoopSafepoints || !OptoRemoveUseless ) return;
+  // Implementation requires an edge from root to each SafePointNode
+  // at a backward branch. Inserted in add_safepoint().
 
   // Identify nodes that are reachable from below, useful.
   C->identify_useful_nodes(_useful);
@@ -425,7 +423,7 @@ PhaseRemoveUseless::PhaseRemoveUseless(PhaseGVN* gvn, Unique_Node_List* worklist
   worklist->remove_useless_nodes(_useful.member_set());
 
   // Disconnect 'useless' nodes that are adjacent to useful nodes
-  C->remove_useless_nodes(_useful);
+  C->disconnect_useless_nodes(_useful, worklist);
 }
 
 //=============================================================================
@@ -993,8 +991,7 @@ PhaseIterGVN::PhaseIterGVN(PhaseGVN* gvn) : PhaseGVN(gvn),
     if(n != NULL && n != _table.sentinel() && n->outcnt() == 0) {
       if( n->is_top() ) continue;
       // If remove_useless_nodes() has run, we expect no such nodes left.
-      assert(!UseLoopSafepoints || !OptoRemoveUseless,
-             "remove_useless_nodes missed this node");
+      assert(false, "remove_useless_nodes missed this node");
       hash_delete(n);
     }
   }
@@ -1024,11 +1021,17 @@ void PhaseIterGVN::shuffle_worklist() {
 #ifndef PRODUCT
 void PhaseIterGVN::verify_step(Node* n) {
   if (VerifyIterativeGVN) {
+    ResourceMark rm;
+    VectorSet visited;
+    Node_List worklist;
+
     _verify_window[_verify_counter % _verify_window_size] = n;
     ++_verify_counter;
     if (C->unique() < 1000 || 0 == _verify_counter % (C->unique() < 10000 ? 10 : 100)) {
       ++_verify_full_passes;
-      Node::verify(C->root(), -1);
+      worklist.push(C->root());
+      Node::verify(-1, visited, worklist);
+      return;
     }
     for (int i = 0; i < _verify_window_size; i++) {
       Node* n = _verify_window[i];
@@ -1041,8 +1044,11 @@ void PhaseIterGVN::verify_step(Node* n) {
         continue;
       }
       // Typical fanout is 1-2, so this call visits about 6 nodes.
-      Node::verify(n, 4);
+      if (!visited.test_set(n->_idx)) {
+        worklist.push(n);
+      }
     }
+    Node::verify(4, visited, worklist);
   }
 }
 
@@ -1241,7 +1247,7 @@ Node *PhaseIterGVN::transform_old(Node* n) {
   // Remove 'n' from hash table in case it gets modified
   _table.hash_delete(n);
   if (VerifyIterativeGVN) {
-   assert(!_table.find_index(n->_idx), "found duplicate entry in table");
+    assert(!_table.find_index(n->_idx), "found duplicate entry in table");
   }
 
   // Apply the Ideal call in a loop until it no longer applies
@@ -1756,7 +1762,7 @@ uint PhaseCCP::_total_constants = 0;
 #endif
 //------------------------------PhaseCCP---------------------------------------
 // Conditional Constant Propagation, ala Wegman & Zadeck
-PhaseCCP::PhaseCCP( PhaseIterGVN *igvn ) : PhaseIterGVN(igvn) {
+PhaseCCP::PhaseCCP(PhaseIterGVN* igvn) : PhaseIterGVN(igvn), _trstack(C->live_nodes() >> 1) {
   NOT_PRODUCT( clear_constants(); )
   assert( _worklist.size() == 0, "" );
   // Clear out _nodes from IterGVN.  Must be clear to transform call.
@@ -1809,6 +1815,11 @@ void PhaseCCP::analyze() {
       n = worklist.remove(C->random() % worklist.size());
     } else {
       n = worklist.pop();
+    }
+    if (n->is_SafePoint()) {
+      // Make sure safepoints are processed by PhaseCCP::transform even if they are
+      // not reachable from the bottom. Otherwise, infinite loops would be removed.
+      _trstack.push(n);
     }
     const Type *t = n->Value(this);
     if (t != type(n)) {
@@ -1929,13 +1940,11 @@ Node *PhaseCCP::transform( Node *n ) {
     return new_node;                // Been there, done that, return old answer
   new_node = transform_once(n);     // Check for constant
   _nodes.map( n->_idx, new_node );  // Flag as having been cloned
+  _useful.push(new_node); // Keep track of nodes that are reachable from the bottom
 
-  // Allocate stack of size _nodes.Size()/2 to avoid frequent realloc
-  GrowableArray <Node *> trstack(C->live_nodes() >> 1);
-
-  trstack.push(new_node);           // Process children of cloned node
-  while ( trstack.is_nonempty() ) {
-    Node *clone = trstack.pop();
+  _trstack.push(new_node);           // Process children of cloned node
+  while (_trstack.is_nonempty()) {
+    Node* clone = _trstack.pop();
     uint cnt = clone->req();
     for( uint i = 0; i < cnt; i++ ) {          // For all inputs do
       Node *input = clone->in(i);
@@ -1944,12 +1953,30 @@ Node *PhaseCCP::transform( Node *n ) {
         if( new_input == NULL ) {
           new_input = transform_once(input);   // Check for constant
           _nodes.map( input->_idx, new_input );// Flag as having been cloned
-          trstack.push(new_input);
+          _useful.push(new_input);
+          _trstack.push(new_input);
         }
         assert( new_input == clone->in(i), "insanity check");
       }
     }
   }
+
+  // The above transformation might lead to subgraphs becoming unreachable from the
+  // bottom while still being reachable from the top. As a result, nodes in that
+  // subgraph are not transformed and their bottom types are not updated, leading to
+  // an inconsistency between bottom_type() and type(). In rare cases, LoadNodes in
+  // such a subgraph, kept alive by InlineTypePtrNodes, might be re-enqueued for IGVN
+  // indefinitely by MemNode::Ideal_common because their address type is inconsistent.
+  // Therefore, we aggressively remove all useless nodes here even before
+  // PhaseIdealLoop::build_loop_late gets a chance to remove them anyway.
+  if (C->cached_top_node()) {
+    _useful.push(C->cached_top_node());
+  }
+  C->update_dead_node_list(_useful);
+  remove_useless_nodes(_useful.member_set());
+  _worklist.remove_useless_nodes(_useful.member_set());
+  C->disconnect_useless_nodes(_useful, &_worklist);
+
   return new_node;
 }
 

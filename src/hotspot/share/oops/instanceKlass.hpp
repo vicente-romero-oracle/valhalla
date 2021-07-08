@@ -32,7 +32,6 @@
 #include "oops/fieldInfo.hpp"
 #include "oops/instanceOop.hpp"
 #include "runtime/handles.hpp"
-#include "runtime/os.hpp"
 #include "utilities/accessFlags.hpp"
 #include "utilities/align.hpp"
 #include "utilities/macros.hpp"
@@ -52,8 +51,6 @@ class RecordComponent;
 //      The embedded nonstatic oop-map blocks are short pairs (offset, length)
 //      indicating where oops are located in instances of this klass.
 //    [EMBEDDED implementor of the interface] only exist for interface
-//    [EMBEDDED unsafe_anonymous_host klass] only exist for an unsafe anonymous class (JSR 292 enabled)
-//    [EMBEDDED fingerprint       ] only if should_store_fingerprint()==true
 //    [EMBEDDED inline_type_field_klasses] only if has_inline_fields() == true
 //    [EMBEDDED InlineKlassFixedBlock] only if is an InlineKlass instance
 
@@ -83,7 +80,6 @@ public:
   virtual void do_field(fieldDescriptor* fd) = 0;
 };
 
-#ifndef PRODUCT
 // Print fields.
 // If "obj" argument to constructor is NULL, prints static fields, otherwise prints non-static fields.
 class FieldPrinter: public FieldClosure {
@@ -93,7 +89,6 @@ class FieldPrinter: public FieldClosure {
    FieldPrinter(outputStream* st, oop obj = NULL) : _obj(obj), _st(st) {}
    void do_field(fieldDescriptor* fd);
 };
-#endif  // !PRODUCT
 
 // Describes where oops are located in instances of this klass.
 class OopMapBlock {
@@ -144,6 +139,7 @@ class InlineKlassFixedBlock {
   address* _pack_handler_jobject;
   address* _unpack_handler;
   int* _default_value_offset;
+  ArrayKlass** _null_free_inline_array_klasses;
   int _alignment;
   int _first_field_offset;
   int _exact_size_in_bytes;
@@ -233,29 +229,27 @@ class InstanceKlass: public Klass {
   // Number of heapOopSize words used by non-static fields in this klass
   // (including inherited fields but after header_size()).
   int             _nonstatic_field_size;
-  int             _static_field_size;    // number words used by static fields (oop and non-oop) in this klass
-
-  int             _nonstatic_oop_map_size;// size in words of nonstatic oop map blocks
-  int             _itable_len;           // length of Java itable (in words)
+  int             _static_field_size;       // number words used by static fields (oop and non-oop) in this klass
+  int             _nonstatic_oop_map_size;  // size in words of nonstatic oop map blocks
+  int             _itable_len;              // length of Java itable (in words)
 
   // The NestHost attribute. The class info index for the class
   // that is the nest-host of this class. This data has not been validated.
   u2              _nest_host_index;
-  u2              _this_class_index;              // constant pool entry
+  u2              _this_class_index;        // constant pool entry
+  u2              _static_oop_field_count;  // number of static oop fields in this klass
+  u2              _java_fields_count;       // The number of declared Java fields
 
-  u2              _static_oop_field_count;// number of static oop fields in this klass
-  u2              _java_fields_count;    // The number of declared Java fields
-
-  volatile u2     _idnum_allocated_count;         // JNI/JVMTI: increments with the addition of methods, old ids don't change
+  volatile u2     _idnum_allocated_count;   // JNI/JVMTI: increments with the addition of methods, old ids don't change
 
   // _is_marked_dependent can be set concurrently, thus cannot be part of the
   // _misc_flags.
-  bool            _is_marked_dependent;  // used for marking during flushing and deoptimization
+  bool            _is_marked_dependent;     // used for marking during flushing and deoptimization
 
   // Class states are defined as ClassState (see above).
   // Place the _init_state here to utilize the unused 2-byte after
   // _idnum_allocated_count.
-  u1              _init_state;                    // state of class
+  u1              _init_state;              // state of class
 
   // This can be used to quickly discriminate among the five kinds of
   // InstanceKlass. This should be an enum (?)
@@ -272,13 +266,12 @@ class InstanceKlass: public Klass {
     _misc_rewritten                           = 1 << 0,  // methods rewritten.
     _misc_has_nonstatic_fields                = 1 << 1,  // for sizing with UseCompressedOops
     _misc_should_verify_class                 = 1 << 2,  // allow caching of preverification
-    _misc_is_unsafe_anonymous                 = 1 << 3,  // has embedded _unsafe_anonymous_host field
+    _misc_unused                              = 1 << 3,  // not currently used
     _misc_is_contended                        = 1 << 4,  // marked with contended annotation
     _misc_has_nonstatic_concrete_methods      = 1 << 5,  // class/superclass/implemented interfaces has non-static, concrete methods
     _misc_declares_nonstatic_concrete_methods = 1 << 6,  // directly declares non-static, concrete methods
     _misc_has_been_redefined                  = 1 << 7,  // class has been redefined
-    _misc_has_passed_fingerprint_check        = 1 << 8,  // when this class was loaded, the fingerprint computed from its
-                                                         // code source was found to be matching the value recorded by AOT.
+    _misc_shared_loading_failed               = 1 << 8,  // class has been loaded from shared archive
     _misc_is_scratch_class                    = 1 << 9,  // class is the redefined scratch class
     _misc_is_shared_boot_class                = 1 << 10, // defining class loader is boot class loader
     _misc_is_shared_platform_class            = 1 << 11, // defining class loader is platform class loader
@@ -371,13 +364,6 @@ class InstanceKlass: public Klass {
   //     NULL: no implementor.
   //     A Klass* that's not itself: one implementor.
   //     Itself: more than one implementors.
-  // embedded unsafe_anonymous_host klass follows here
-  //   The embedded host klass only exists in an unsafe anonymous class for
-  //   dynamic language support (JSR 292 enabled). The host class grants
-  //   its access privileges to this class also. The host class is either
-  //   named, or a previously loaded unsafe anonymous class. A non-anonymous class
-  //   or an anonymous class loaded through normal classloading does not
-  //   have this embedded field.
   //
 
   friend class SystemDictionary;
@@ -405,6 +391,18 @@ class InstanceKlass: public Klass {
 
   void clear_shared_class_loader_type() {
     _misc_flags &= ~shared_loader_type_bits();
+  }
+
+  bool shared_loading_failed() const {
+    return (_misc_flags & _misc_shared_loading_failed) != 0;
+  }
+
+  void set_shared_loading_failed() {
+    _misc_flags |= _misc_shared_loading_failed;
+  }
+
+  void clear_shared_loading_failed() {
+    _misc_flags &= ~_misc_shared_loading_failed;
   }
 
   void set_shared_class_loader_type(s2 loader_type);
@@ -558,7 +556,7 @@ class InstanceKlass: public Klass {
   Symbol* field_name        (int index) const { return field(index)->name(constants()); }
   Symbol* field_signature   (int index) const { return field(index)->signature(constants()); }
   bool    field_is_inlined(int index) const { return field(index)->is_inlined(); }
-  bool    field_is_inline_type(int index) const;
+  bool    field_is_null_free_inline_type(int index) const;
 
   // Number of Java declared fields
   int java_fields_count() const           { return (int)_java_fields_count; }
@@ -596,8 +594,9 @@ class InstanceKlass: public Klass {
   void set_permitted_subclasses(Array<u2>* s) { _permitted_subclasses = s; }
 
 private:
-  // Called to verify that k is a member of this nest - does not look at k's nest-host
-  bool has_nest_member(InstanceKlass* k, TRAPS) const;
+  // Called to verify that k is a member of this nest - does not look at k's nest-host,
+  // nor does it resolve any CP entries or load any classes.
+  bool has_nest_member(JavaThread* current, InstanceKlass* k) const;
 
 public:
   // Used to construct informative IllegalAccessError messages at a higher level,
@@ -807,20 +806,6 @@ public:
   // signers
   objArrayOop signers() const;
 
-  // host class
-  inline InstanceKlass* unsafe_anonymous_host() const;
-  inline void set_unsafe_anonymous_host(const InstanceKlass* host);
-  bool is_unsafe_anonymous() const                {
-    return (_misc_flags & _misc_is_unsafe_anonymous) != 0;
-  }
-  void set_is_unsafe_anonymous(bool value)        {
-    if (value) {
-      _misc_flags |= _misc_is_unsafe_anonymous;
-    } else {
-      _misc_flags &= ~_misc_is_unsafe_anonymous;
-    }
-  }
-
   bool is_contended() const                {
     return (_misc_flags & _misc_is_contended) != 0;
   }
@@ -908,24 +893,6 @@ public:
   void set_has_been_redefined() {
     _misc_flags |= _misc_has_been_redefined;
   }
-
-  bool has_passed_fingerprint_check() const {
-    return (_misc_flags & _misc_has_passed_fingerprint_check) != 0;
-  }
-  void set_has_passed_fingerprint_check(bool b) {
-    if (b) {
-      _misc_flags |= _misc_has_passed_fingerprint_check;
-    } else {
-      _misc_flags &= ~_misc_has_passed_fingerprint_check;
-    }
-  }
-  bool supers_have_passed_fingerprint_checks();
-
-  static bool should_store_fingerprint(bool is_hidden_or_anonymous);
-  bool should_store_fingerprint() const { return should_store_fingerprint(is_hidden() || is_unsafe_anonymous()); }
-  bool has_stored_fingerprint() const;
-  uint64_t get_stored_fingerprint() const;
-  void store_fingerprint(uint64_t fingerprint);
 
   bool is_scratch_class() const {
     return (_misc_flags & _misc_is_scratch_class) != 0;
@@ -1188,27 +1155,25 @@ public:
 
   static int size(int vtable_length, int itable_length,
                   int nonstatic_oop_map_size,
-                  bool is_interface, bool is_unsafe_anonymous, bool has_stored_fingerprint,
+                  bool is_interface,
                   int java_fields, bool is_inline_type) {
     return align_metadata_size(header_size() +
            vtable_length +
            itable_length +
            nonstatic_oop_map_size +
            (is_interface ? (int)sizeof(Klass*)/wordSize : 0) +
-           (is_unsafe_anonymous ? (int)sizeof(Klass*)/wordSize : 0) +
-           (has_stored_fingerprint ? (int)sizeof(uint64_t*)/wordSize : 0) +
            (java_fields * (int)sizeof(Klass*)/wordSize) +
            (is_inline_type ? (int)sizeof(InlineKlassFixedBlock) : 0));
   }
+
   int size() const                    { return size(vtable_length(),
                                                itable_length(),
                                                nonstatic_oop_map_size(),
                                                is_interface(),
-                                               is_unsafe_anonymous(),
-                                               has_stored_fingerprint(),
                                                has_inline_type_fields() ? java_fields_count() : 0,
                                                is_inline_klass());
   }
+
 
   inline intptr_t* start_of_itable() const;
   inline intptr_t* end_of_itable() const;
@@ -1220,8 +1185,6 @@ public:
   inline Klass** end_of_nonstatic_oop_maps() const;
 
   inline InstanceKlass* volatile* adr_implementor() const;
-  inline InstanceKlass** adr_unsafe_anonymous_host() const;
-  inline address adr_fingerprint() const;
 
   inline address adr_inline_type_field_klasses() const;
   inline Klass* get_inline_type_field_klass(int idx) const;
@@ -1284,6 +1247,7 @@ public:
 
   // Naming
   const char* signature_name() const;
+  const char* signature_name_of_carrier(char c) const;
 
   // Oop fields (and metadata) iterators
   //
@@ -1359,6 +1323,15 @@ public:
   // cannot lock it (like the mirror).
   // It has to be an object not a Mutex because it's held through java calls.
   oop init_lock() const;
+
+  // Returns the array class for the n'th dimension
+  virtual Klass* array_klass(int n, TRAPS);
+  virtual Klass* array_klass_or_null(int n);
+
+  // Returns the array class with this class as element type
+  virtual Klass* array_klass(TRAPS);
+  virtual Klass* array_klass_or_null();
+
 private:
   void fence_and_clear_init_lock();
 
@@ -1369,14 +1342,6 @@ private:
   void eager_initialize_impl                     ();
   /* jni_id_for_impl for jfieldID only */
   JNIid* jni_id_for_impl                         (int offset);
-protected:
-  // Returns the array class for the n'th dimension
-  virtual Klass* array_klass_impl(bool or_null, int n, TRAPS);
-
-  // Returns the array class with this class as element type
-  virtual Klass* array_klass_impl(bool or_null, TRAPS);
-
-private:
 
   // find a local method (returns NULL if not found)
   Method* find_method_impl(const Symbol* name,
@@ -1408,6 +1373,7 @@ public:
   virtual void remove_java_mirror();
   virtual void restore_unshareable_info(ClassLoaderData* loader_data, Handle protection_domain, PackageEntry* pkg_entry, TRAPS);
   void init_shared_package_entry();
+  bool can_be_verified_at_dumptime() const;
 
   jint compute_modifier_flags() const;
 
@@ -1419,16 +1385,14 @@ public:
 
  public:
   // Printing
-#ifndef PRODUCT
   void print_on(outputStream* st) const;
-#endif
   void print_value_on(outputStream* st) const;
 
   void oop_print_value_on(oop obj, outputStream* st);
 
-#ifndef PRODUCT
   void oop_print_on      (oop obj, outputStream* st);
 
+#ifndef PRODUCT
   void print_dependent_nmethods(bool verbose = false);
   bool is_dependent_nmethod(nmethod* nm);
   bool verify_itable_index(int index);
@@ -1585,7 +1549,6 @@ class ClassHierarchyIterator : public StackObj {
 
  public:
   ClassHierarchyIterator(InstanceKlass* root) : _root(root), _current(root), _visit_subclasses(true) {
-    assert(!root->is_interface(), "no subclasses");
     assert(_root == _current, "required"); // initial state
   }
 

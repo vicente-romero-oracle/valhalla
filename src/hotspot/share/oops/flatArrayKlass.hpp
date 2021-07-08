@@ -43,16 +43,17 @@ class FlatArrayKlass : public ArrayKlass {
   // Constructor
   FlatArrayKlass(Klass* element_klass, Symbol* name);
 
- protected:
-  // Returns the ArrayKlass for n'th dimension.
-  Klass* array_klass_impl(bool or_null, int n, TRAPS);
-
-  // Returns the array class with this class as element type.
-  Klass* array_klass_impl(bool or_null, TRAPS);
-
  public:
 
   FlatArrayKlass() {}
+
+  // Returns the ObjArrayKlass for n'th dimension.
+  virtual Klass* array_klass(int n, TRAPS);
+  virtual Klass* array_klass_or_null(int n);
+
+  // Returns the array class with this class as element type.
+  virtual Klass* array_klass(TRAPS);
+  virtual Klass* array_klass_or_null();
 
   virtual InlineKlass* element_klass() const;
   virtual void set_element_klass(Klass* k);
@@ -89,6 +90,8 @@ class FlatArrayKlass : public ArrayKlass {
   }
 
   oop protection_domain() const;
+
+  virtual void metaspace_pointers_do(MetaspaceClosure* iter);
 
   static jint array_layout_helper(InlineKlass* vklass); // layout helper for values
 
@@ -139,6 +142,8 @@ private:
   inline void oop_oop_iterate_elements_specialized_bounded(flatArrayOop a, OopClosureType* closure, void* low, void* high);
 
  public:
+  jint compute_modifier_flags() const;
+
   // Printing
   void print_on(outputStream* st) const;
   void print_value_on(outputStream* st) const;

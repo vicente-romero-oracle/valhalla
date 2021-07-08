@@ -153,9 +153,6 @@
   product(bool, InlineSynchronizedMethods, true,                            \
           "Inline synchronized methods")                                    \
                                                                             \
-  product(bool, InlineNIOCheckIndex, true, DIAGNOSTIC,                      \
-          "Intrinsify java.nio.Buffer.checkIndex")                          \
-                                                                            \
   develop(bool, CanonicalizeNodes, true,                                    \
           "Canonicalize graph nodes")                                       \
                                                                             \
@@ -332,7 +329,10 @@
           "Update MethodData*s in Tier1-generated code")                    \
                                                                             \
   develop(bool, PrintCFGToFile, false,                                      \
-          "print control flow graph to a separate file during compilation")
+          "print control flow graph to a separate file during compilation") \
+                                                                            \
+  develop(bool, C1UseDelayedFlattenedFieldReads, true,                      \
+          "Use delayed reads of flattened field to reduce buffering")
 
 // end of C1_FLAGS
 

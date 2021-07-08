@@ -543,7 +543,7 @@ void InterpreterMacroAssembler::dispatch_base(TosState state,
 
   if (needs_thread_local_poll) {
     NOT_PRODUCT(block_comment("Thread-local Safepoint poll"));
-    ldr(rscratch2, Address(rthread, Thread::polling_word_offset()));
+    ldr(rscratch2, Address(rthread, JavaThread::polling_word_offset()));
     tbnz(rscratch2, exact_log2(SafepointMechanism::poll_bit()), safepoint);
   }
 
@@ -793,12 +793,10 @@ void InterpreterMacroAssembler::remove_activation(
 
     blr(rscratch1);
 
-    // call above kills the value in r1. Reload it.
-    ldr(r1, Address(rfp, frame::interpreter_frame_sender_sp_offset * wordSize));
+    // call above kills sender esp in rscratch2. Reload it.
+    ldr(rscratch2, Address(rfp, frame::interpreter_frame_sender_sp_offset * wordSize));
     bind(skip);
   }
-
-
 
   // restore sender esp
   mov(esp, rscratch2);

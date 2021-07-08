@@ -305,12 +305,6 @@ const char* Runtime1::name_for_address(address entry) {
     if (entry == entry_for((StubID)id)) return name_for((StubID)id);
   }
 
-  BarrierSetC1* bsc1 = BarrierSet::barrier_set()->barrier_set_c1();
-  const char* name = bsc1->rtcall_name_for_address(entry);
-  if (name != NULL) {
-    return name;
-  }
-
 #define FUNCTION_CASE(a, f) \
   if ((intptr_t)a == CAST_FROM_FN_PTR(intptr_t, f))  return #f
 
@@ -523,7 +517,7 @@ JRT_END
 extern "C" void ps();
 
 void Runtime1::buffer_inline_args_impl(JavaThread* current, Method* m, bool allocate_receiver) {
-  Thread* THREAD = current;
+  JavaThread* THREAD = current;
   methodHandle method(current, m); // We are inside the verified_entry or verified_inline_ro_entry of this method.
   oop obj = SharedRuntime::allocate_inline_types_impl(current, method, allocate_receiver, CHECK);
   current->set_vm_result(obj);
