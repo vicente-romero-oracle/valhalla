@@ -106,10 +106,6 @@ public class ClassReader {
      */
     boolean allowModules;
 
-    /** Switch: allow primitive classes.
-     */
-    boolean allowPrimitiveClasses;
-
     /** Switch: allow value classes.
      */
     boolean allowValueClasses;
@@ -286,7 +282,6 @@ public class ClassReader {
         Source source = Source.instance(context);
         preview = Preview.instance(context);
         allowModules     = Feature.MODULES.allowedInSource(source);
-        allowPrimitiveClasses = Feature.PRIMITIVE_CLASSES.allowedInSource(source) && options.isSet("enablePrimitiveClasses");
         allowValueClasses = Feature.VALUE_CLASSES.allowedInSource(source);
         allowRecords = Feature.RECORDS.allowedInSource(source);
         allowSealedTypes = Feature.SEALED_CLASSES.allowedInSource(source);
@@ -487,10 +482,6 @@ public class ClassReader {
         case 'L':
             {
                 // int oldsigp = sigp;
-                if ((char) signature[sigp] == 'Q' && !allowPrimitiveClasses) {
-                    throw badClassFile("bad.class.signature",
-                            Convert.utf2string(signature, sigp, 10));
-                }
                 Type t = classSigToType();
                 if (sigp < siglimit && signature[sigp] == '.')
                     throw badClassFile("deprecated inner class signature syntax " +
@@ -550,7 +541,7 @@ public class ClassReader {
      */
     Type classSigToType() {
         byte prefix = signature[sigp];
-        if (prefix != 'L' && (!allowPrimitiveClasses || prefix != 'Q'))
+        if (prefix != 'L')
             throw badClassFile("bad.class.signature",
                                Convert.utf2string(signature, sigp, 10));
         sigp++;
@@ -2551,11 +2542,6 @@ public class ClassReader {
         if (c == syms.objectType.tsym) {
             flags &= ~IDENTITY_TYPE; // jlO lacks identity even while being a concrete class.
         }
-        if ((flags & PRIMITIVE_CLASS) != 0) {
-            if (!allowPrimitiveClasses || (flags & (FINAL | PRIMITIVE_CLASS | IDENTITY_TYPE)) != (FINAL | PRIMITIVE_CLASS)) {
-                throw badClassFile("bad.access.flags", Flags.toString(flags));
-            }
-        }
         if ((flags & MODULE) == 0) {
             if (c.owner.kind == PCK || c.owner.kind == ERR) c.flags_field = flags;
             // read own class name and check that it matches
@@ -2811,9 +2797,6 @@ public class ClassReader {
         }
         if ((flags & ACC_PRIMITIVE) != 0) {
             flags &= ~ACC_PRIMITIVE;
-            if (allowPrimitiveClasses) {
-                flags |= PRIMITIVE_CLASS;
-            }
         }
         if ((flags & ACC_VALUE) != 0) {
             flags &= ~ACC_VALUE;

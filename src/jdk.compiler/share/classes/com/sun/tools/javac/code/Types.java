@@ -91,7 +91,6 @@ public class Types {
     final Symtab syms;
     final JavacMessages messages;
     final Names names;
-    final boolean allowPrimitiveClasses;
     final Check chk;
     final Enter enter;
     JCDiagnostic.Factory diags;
@@ -120,7 +119,6 @@ public class Types {
         diags = JCDiagnostic.Factory.instance(context);
         noWarnings = new Warner(null);
         Options options = Options.instance(context);
-        allowPrimitiveClasses = Feature.PRIMITIVE_CLASSES.allowedInSource(source) && options.isSet("enablePrimitiveClasses");
         qualifiedSymbolCache = new HashMap<>();
     }
     // </editor-fold>
@@ -602,16 +600,6 @@ public class Types {
             return true;
         }
 
-        if (allowPrimitiveClasses) {
-            boolean tValue = t.isPrimitiveClass();
-            boolean sValue = s.isPrimitiveClass();
-            if (tValue != sValue) {
-                return tValue ?
-                        isSubtype(t.referenceProjection(), s) :
-                        !t.hasTag(BOT) && isSubtype(t, s.referenceProjection());
-            }
-        }
-
         boolean tPrimitive = t.isPrimitive();
         boolean sPrimitive = s.isPrimitive();
         if (tPrimitive == sPrimitive) {
@@ -1052,13 +1040,6 @@ public class Types {
                     // if T.ref <: S, then T[] <: S[]
                     Type es = elemtype(s);
                     Type et = elemtype(t);
-                    if (allowPrimitiveClasses) {
-                        if (et.isPrimitiveClass()) {
-                            et = et.referenceProjection();
-                            if (es.isPrimitiveClass())
-                                es = es.referenceProjection();  // V <: V, surely
-                        }
-                    }
                     if (!isSubtypeUncheckedInternal(et, es, false, warn))
                         return false;
                     return true;
@@ -1158,7 +1139,7 @@ public class Types {
                      return isSubtypeNoCapture(t.getUpperBound(), s);
                  case BOT:
                      return
-                         s.hasTag(BOT) || (s.hasTag(CLASS) && (!allowPrimitiveClasses || !s.isPrimitiveClass())) ||
+                         s.hasTag(BOT) || s.hasTag(CLASS) ||
                          s.hasTag(ARRAY) || s.hasTag(TYPEVAR);
                  case WILDCARD: //we shouldn't be here - avoids crash (see 7034495)
                  case NONE:
@@ -1241,11 +1222,6 @@ public class Types {
                         // if T.ref <: S, then T[] <: S[]
                         Type es = elemtype(s);
                         Type et = elemtype(t);
-                        if (allowPrimitiveClasses && et.isPrimitiveClass()) {
-                            et = et.referenceProjection();
-                            if (es.isPrimitiveClass())
-                                es = es.referenceProjection();  // V <: V, surely
-                        }
                         return isSubtypeNoCapture(et, es);
                     }
                 }
@@ -1794,7 +1770,7 @@ public class Types {
 
             @Override
             public Boolean visitClassType(ClassType t, Type s) {
-                if (s.hasTag(ERROR) || (s.hasTag(BOT) && (!allowPrimitiveClasses || !t.isPrimitiveClass())))
+                if (s.hasTag(ERROR) || s.hasTag(BOT))
                     return true;
 
                 if (s.hasTag(TYPEVAR)) {
@@ -1813,16 +1789,6 @@ public class Types {
                 }
 
                 if (s.hasTag(CLASS) || s.hasTag(ARRAY)) {
-                    if (allowPrimitiveClasses) {
-                        if (t.isPrimitiveClass()) {
-                            // (s) Value ? == (s) Value.ref
-                            t = t.referenceProjection();
-                        }
-                        if (s.isPrimitiveClass()) {
-                            // (Value) t ? == (Value.ref) t
-                            s = s.referenceProjection();
-                        }
-                    }
                     boolean upcast;
                     if ((upcast = isSubtype(erasure(t), erasure(s)))
                         || isSubtype(erasure(s), erasure(t))) {
@@ -2216,35 +2182,6 @@ public class Types {
      * this method could yield surprising answers when invoked on arrays. For example when
      * invoked with t being byte [] and sym being t.sym itself, asSuper would answer null.
      *
-     * Further caveats in Valhalla: There are two "hazards" we need to watch out for when using
-     * this method.
-     *
-     * 1. Since Foo.ref and Foo.val share the same symbol, that of Foo.class, a call to
-     *    asSuper(Foo.ref.type, Foo.val.type.tsym) would return non-null. This MAY NOT BE correct
-     *    depending on the call site. Foo.val is NOT a super type of Foo.ref either in the language
-     *    model or in the VM's world view. An example of such an hazardous call used to exist in
-     *    Gen.visitTypeCast. When we emit code for  (Foo) Foo.ref.instance a check for whether we
-     *    really need the cast cannot/shouldn't be gated on
-     *
-     *        asSuper(tree.expr.type, tree.clazz.type.tsym) == null)
-     *
-     *    but use !types.isSubtype(tree.expr.type, tree.clazz.type) which operates in terms of
-     *    types. When we operate in terms of symbols, there is a loss of type information leading
-     *    to a hazard. Whether a call to asSuper should be transformed into a isSubtype call is
-     *    tricky. isSubtype returns just a boolean while asSuper returns richer information which
-     *    may be required at the call site. Also where the concerned symbol corresponds to a
-     *    generic class, an asSuper call cannot be conveniently rewritten as an isSubtype call
-     *    (see that asSuper(ArrayList<String>.type, List<T>.tsym) != null while
-     *    isSubType(ArrayList<String>.type, List<T>.type) is false;) So care needs to be exercised.
-     *
-     * 2. Given a primitive class Foo, a call to asSuper(Foo.type, SuperclassOfFoo.tsym) and/or
-     *    a call to asSuper(Foo.type, SuperinterfaceOfFoo.tsym) would answer null. In many places
-     *    that is NOT what we want. An example of such a hazardous call used to occur in
-     *    Attr.visitForeachLoop when checking to make sure the for loop's control variable of a type
-     *    that implements Iterable: viz: types.asSuper(exprType, syms.iterableType.tsym);
-     *    These hazardous calls should be rewritten as
-     *    types.asSuper(exprType.referenceProjectionOrSelf(), syms.iterableType.tsym); instead.
-     *
      * @param t a type
      * @param sym a symbol
      */
@@ -2257,12 +2194,6 @@ public class Types {
          * (j.u.List<capture#160 of ? extends c.s.s.d.DocTree>, Iterable) =>
          *     Iterable<capture#160 of ? extends c.s.s.d.DocTree>
          */
-
-        if (allowPrimitiveClasses && t.isPrimitiveClass()) {
-            // No man may be an island, but the bell tolls for a value.
-            return t.tsym == sym ? t : null;
-        }
-
         if (sym.type == syms.objectType) { //optimization
             return syms.objectType;
         }
@@ -2393,18 +2324,9 @@ public class Types {
      * @param sym a symbol
      */
     public Type memberType(Type t, Symbol sym) {
-
-        if ((sym.flags() & STATIC) != 0)
-            return sym.type;
-
-        /* If any primitive class types are involved, switch over to the reference universe,
-           where the hierarchy is navigable. V and V.ref have identical membership
-           with no bridging needs.
-        */
-        if (allowPrimitiveClasses && t.isPrimitiveClass())
-            t = t.referenceProjection();
-
-        return memberType.visit(t, sym);
+        return (sym.flags() & STATIC) != 0
+            ? sym.type
+            : memberType.visit(t, sym);
         }
     // where
         private SimpleVisitor<Type,Symbol> memberType = new SimpleVisitor<Type,Symbol>() {
@@ -5301,10 +5223,7 @@ public class Types {
                     if (type.isCompound()) {
                         reportIllegalSignature(type);
                     }
-                    if (types.allowPrimitiveClasses && type.isPrimitiveClass())
-                        append('Q');
-                    else
-                        append('L');
+                    append('L');
                     assembleClassSig(type);
                     append(';');
                     break;

@@ -135,7 +135,6 @@ public class Gen extends JCTree.Visitor {
         this.stackMap = StackMapFormat.JSR202;
         annotate = Annotate.instance(context);
         Source source = Source.instance(context);
-        allowPrimitiveClasses = Source.Feature.PRIMITIVE_CLASSES.allowedInSource(source) && options.isSet("enablePrimitiveClasses");
     }
 
     /** Switches
@@ -178,8 +177,6 @@ public class Gen extends JCTree.Visitor {
     LocalItem switchResult;
     Set<JCMethodInvocation> invocationsWithPatternMatchingCatch = Set.of();
     ListBuffer<int[]> patternMatchingInvocationRanges;
-
-    boolean allowPrimitiveClasses;
 
     /** Generate code to load an integer constant.
      *  @param n     The integer to be loaded.
@@ -1021,8 +1018,7 @@ public class Gen extends JCTree.Visitor {
                                                : null,
                                         syms,
                                         types,
-                                        poolWriter,
-                                        allowPrimitiveClasses);
+                                        poolWriter);
             items = new Items(poolWriter, code, syms, types);
             if (code.debugCode) {
                 System.err.println(meth + " for body " + tree);

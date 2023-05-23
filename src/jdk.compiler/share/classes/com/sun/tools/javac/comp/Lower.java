@@ -102,7 +102,6 @@ public class Lower extends TreeTranslator {
     private final boolean disableProtectedAccessors; // experimental
     private final PkgInfo pkginfoOpt;
     private final boolean optimizeOuterThis;
-    private final boolean allowPrimitiveClasses;
     private final boolean useMatchException;
 
     protected Lower(Context context) {
@@ -131,7 +130,6 @@ public class Lower extends TreeTranslator {
             options.getBoolean("optimizeOuterThis", false);
         disableProtectedAccessors = options.isSet("disableProtectedAccessors");
         Source source = Source.instance(context);
-        allowPrimitiveClasses = Source.Feature.PRIMITIVE_CLASSES.allowedInSource(source) && options.isSet("enablePrimitiveClasses");
         Preview preview = Preview.instance(context);
         useMatchException = Feature.PATTERN_SWITCH.allowedInSource(source) &&
                             (preview.isEnabled() || !preview.isPreview(Feature.PATTERN_SWITCH));
@@ -1151,9 +1149,6 @@ public class Lower extends TreeTranslator {
         switch (sym.kind) {
         case TYP:
             if (sym.owner.kind != PCK) {
-                // Make sure not to lose type fidelity due to symbol sharing between projections
-                boolean requireReferenceProjection = allowPrimitiveClasses &&
-                        tree.hasTag(SELECT) && ((JCFieldAccess) tree).name == names.ref && tree.type.isReferenceProjection();
                 // Convert type idents to
                 // <flat name> or <package name> . <flat name>
                 Name flatname = Convert.shortName(sym.flatName());
@@ -1169,15 +1164,9 @@ public class Lower extends TreeTranslator {
                 } else if (base == null) {
                     tree = make.at(tree.pos).Ident(sym);
                     ((JCIdent) tree).name = flatname;
-                    if (requireReferenceProjection) {
-                        tree.setType(tree.type.referenceProjection());
-                    }
                 } else {
                     ((JCFieldAccess) tree).selected = base;
                     ((JCFieldAccess) tree).name = flatname;
-                    if (requireReferenceProjection) {
-                        tree.setType(tree.type.referenceProjection());
-                    }
                 }
             }
             break;
@@ -4162,11 +4151,7 @@ public class Lower extends TreeTranslator {
          * always the "primary" mirror - representing the primitive reference runtime type - thereby
          * always matching the behavior of Object::getClass
          */
-        boolean needPrimaryMirror = tree.name == names._class && tree.selected.type.isReferenceProjection();
         tree.selected = translate(tree.selected);
-        if (needPrimaryMirror && allowPrimitiveClasses && tree.selected.type.isPrimitiveClass()) {
-            tree.selected.setType(tree.selected.type.referenceProjection());
-        }
         if (tree.name == names._class) {
             result = classOf(tree.selected);
         }

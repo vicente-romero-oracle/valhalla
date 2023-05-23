@@ -105,7 +105,6 @@ public class Enter extends JCTree.Visitor {
     TypeEnvs typeEnvs;
     Modules modules;
     JCDiagnostic.Factory diags;
-    boolean allowPrimitiveClasses;
 
     private final Todo todo;
 
@@ -145,8 +144,6 @@ public class Enter extends JCTree.Visitor {
         Options options = Options.instance(context);
         pkginfoOpt = PkgInfo.get(options);
         typeEnvs = TypeEnvs.instance(context);
-        Source source = Source.instance(context);
-        allowPrimitiveClasses = Source.Feature.PRIMITIVE_CLASSES.allowedInSource(source) && options.isSet("enablePrimitiveClasses");
     }
 
     /** Accessor for typeEnvs
@@ -507,10 +504,6 @@ public class Enter extends JCTree.Visitor {
         c.clearAnnotationMetadata();
 
         ClassType ct = (ClassType)c.type;
-        if (allowPrimitiveClasses) {
-            ct.flavor = ct.flavor.metamorphose((c.flags_field & PRIMITIVE_CLASS) != 0);
-        }
-
         if (owner.kind != PCK && (c.flags_field & STATIC) == 0) {
             // We are seeing a local or inner class.
             // Set outer_field of this class to closest enclosing class
@@ -529,12 +522,6 @@ public class Enter extends JCTree.Visitor {
         // Enter type parameters.
         ct.typarams_field = classEnter(tree.typarams, localEnv);
         ct.allparams_field = null;
-        if (allowPrimitiveClasses && ct.isPrimitiveClass()) {
-            if (ct.projection != null) {
-                ct.projection.typarams_field = ct.typarams_field;
-                ct.projection.allparams_field = ct.allparams_field;
-            }
-        }
 
         // install further completer for this type.
         c.completer = typeEnter;

@@ -192,7 +192,6 @@ public class JavacParser implements Parser {
         this.allowYieldStatement = Feature.SWITCH_EXPRESSION.allowedInSource(source);
         this.allowRecords = Feature.RECORDS.allowedInSource(source);
         this.allowSealedTypes = Feature.SEALED_CLASSES.allowedInSource(source);
-        this.allowPrimitiveClasses = Feature.PRIMITIVE_CLASSES.allowedInSource(source) && fac.options.isSet("enablePrimitiveClasses");
         this.allowValueClasses = Feature.VALUE_CLASSES.allowedInSource(source);
     }
 
@@ -230,10 +229,6 @@ public class JavacParser implements Parser {
     /** Switch: are records allowed in this source level?
      */
     boolean allowRecords;
-
-    /** Switch: are primitive classes allowed in this source level?
-     */
-     boolean allowPrimitiveClasses;
 
     /** Switch: are value classes allowed in this source level?
      */
@@ -2806,7 +2801,7 @@ public class JavacParser implements Parser {
                 }
             }
         }
-        if ((isPrimitiveModifier() && allowPrimitiveClasses) || (isValueModifier() || isIdentityModifier()) && allowValueClasses) {
+        if ((isValueModifier() || isIdentityModifier()) && allowValueClasses) {
             dc = token.comment(CommentStyle.JAVADOC);
             return List.of(classOrRecordOrInterfaceOrEnumDeclaration(modifiersOpt(), dc));
         }
@@ -3746,11 +3741,6 @@ public class JavacParser implements Parser {
                 log.warning(pos, Warnings.RestrictedTypeNotAllowedPreview(name, Source.JDK14));
             }
         }
-        if (name == names.primitive) {
-            if (allowPrimitiveClasses) {
-                return Source.JDK18;
-            }
-        }
         if (name == names.value) {
             if (allowValueClasses) {
                 return Source.JDK18;
@@ -3759,9 +3749,7 @@ public class JavacParser implements Parser {
             }
         }
         if (name == names.identity) {
-            if (allowPrimitiveClasses) {
-                return Source.JDK18;
-            } else if (shouldWarn) {
+            if (shouldWarn) {
                 log.warning(pos, Warnings.RestrictedTypeNotAllowedPreview(name, Source.JDK18));
             }
         }
@@ -5250,10 +5238,7 @@ public class JavacParser implements Parser {
     }
 
     protected void checkSourceLevel(int pos, Feature feature) {
-        if (feature == Feature.PRIMITIVE_CLASSES && !allowPrimitiveClasses) {
-            // primitive classes are special
-            log.error(DiagnosticFlag.SOURCE_LEVEL, pos, feature.error(source.name));
-        } else if (preview.isPreview(feature) && !preview.isEnabled()) {
+        if (preview.isPreview(feature) && !preview.isEnabled()) {
             //preview feature without --preview flag, error
             log.error(DiagnosticFlag.SOURCE_LEVEL, pos, preview.disabledError(feature));
         } else if (!feature.allowedInSource(source)) {

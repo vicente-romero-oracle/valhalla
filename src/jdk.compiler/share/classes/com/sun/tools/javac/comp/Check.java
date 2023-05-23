@@ -169,7 +169,6 @@ public class Check {
         allowModules = Feature.MODULES.allowedInSource(source);
         allowRecords = Feature.RECORDS.allowedInSource(source);
         allowSealed = Feature.SEALED_CLASSES.allowedInSource(source);
-        allowPrimitiveClasses = Feature.PRIMITIVE_CLASSES.allowedInSource(source) && options.isSet("enablePrimitiveClasses");
     }
 
     /** Character for synthetic names
@@ -212,11 +211,6 @@ public class Check {
     /** Are sealed classes allowed
      */
     private final boolean allowSealed;
-
-    /** Are primitive classes allowed
-     */
-    private final boolean allowPrimitiveClasses;
-
 /* *************************************************************************
  * Errors and Warnings
  **************************************************************************/
@@ -619,11 +613,6 @@ public class Check {
         if (inferenceContext.free(req) || inferenceContext.free(found)) {
             inferenceContext.addFreeTypeListener(List.of(req, found),
                     solvedContext -> checkType(pos, solvedContext.asInstType(found), solvedContext.asInstType(req), checkContext));
-        } else {
-            if (allowPrimitiveClasses && found.hasTag(CLASS)) {
-                if (inferenceContext != infer.emptyContext)
-                    checkParameterizationByPrimitiveClass(pos, found);
-            }
         }
         if (req.hasTag(ERROR))
             return req;
@@ -817,15 +806,6 @@ public class Check {
                 log.error(expr, Errors.EnumCantBeInstantiated);
                 t = types.createErrorType(t);
             } else {
-                // Projection types may not be mentioned in constructor references
-                if (expr.hasTag(SELECT)) {
-                    JCFieldAccess fieldAccess = (JCFieldAccess) expr;
-                    if (allowPrimitiveClasses && fieldAccess.selected.type.isPrimitiveClass() &&
-                            (fieldAccess.name == names.ref || fieldAccess.name == names.val)) {
-                        log.error(expr, Errors.ProjectionCantBeInstantiated);
-                        t = types.createErrorType(t);
-                    }
-                }
                 t = checkClassType(expr, t, true);
             }
         } else if (t.hasTag(ARRAY)) {
@@ -861,10 +841,9 @@ public class Check {
      *  or a type variable.
      *  @param pos           Position to be used for error reporting.
      *  @param t             The type to be checked.
-     *  @param primitiveClassOK       If false, a primitive class does not qualify
      */
-    Type checkRefType(DiagnosticPosition pos, Type t, boolean primitiveClassOK) {
-        if (t.isReference() && (!allowPrimitiveClasses || primitiveClassOK || !t.isPrimitiveClass()))
+    Type checkRefType(DiagnosticPosition pos, Type t) {
+        if (t.isReference())
             return t;
         else
             return typeTagError(pos,
@@ -890,17 +869,8 @@ public class Check {
             }
             return;
         }
-        if (t.isPrimitive() || t.isValueClass() || t.isValueInterface() || t.isReferenceProjection())
+        if (t.isPrimitive() || t.isValueClass() || t.isValueInterface())
             typeTagError(pos, diags.fragment(Fragments.TypeReqIdentity), t);
-    }
-
-    /** Check that type is a reference type, i.e. a class, interface or array type
-     *  or a type variable.
-     *  @param pos           Position to be used for error reporting.
-     *  @param t             The type to be checked.
-     */
-    Type checkRefType(DiagnosticPosition pos, Type t) {
-        return checkRefType(pos, t, true);
     }
 
     /** Check that each type is a reference type, i.e. a class, interface or array type
@@ -911,7 +881,7 @@ public class Check {
     List<Type> checkRefTypes(List<JCExpression> trees, List<Type> types) {
         List<JCExpression> tl = trees;
         for (List<Type> l = types; l.nonEmpty(); l = l.tail) {
-            l.head = checkRefType(tl.head.pos(), l.head, false);
+            l.head = checkRefType(tl.head.pos(), l.head);
             tl = tl.tail;
         }
         return types;
@@ -946,55 +916,6 @@ public class Check {
         } else
             return true;
     }
-
-    void checkParameterizationByPrimitiveClass(DiagnosticPosition pos, Type t) {
-        parameterizationByPrimitiveClassChecker.visit(t, pos);
-    }
-
-    /** parameterizationByPrimitiveClassChecker: A type visitor that descends down the given type looking for instances of primitive classes
-     *  being used as type arguments and issues error against those usages.
-     */
-    private final Types.SimpleVisitor<Void, DiagnosticPosition> parameterizationByPrimitiveClassChecker =
-            new Types.SimpleVisitor<Void, DiagnosticPosition>() {
-
-        @Override
-        public Void visitType(Type t, DiagnosticPosition pos) {
-            return null;
-        }
-
-        @Override
-        public Void visitClassType(ClassType t, DiagnosticPosition pos) {
-            for (Type targ : t.allparams()) {
-                if (allowPrimitiveClasses && targ.isPrimitiveClass()) {
-                    log.error(pos, Errors.GenericParameterizationWithPrimitiveClass(t));
-                }
-                visit(targ, pos);
-            }
-            return null;
-        }
-
-        @Override
-        public Void visitTypeVar(TypeVar t, DiagnosticPosition pos) {
-             return null;
-        }
-
-        @Override
-        public Void visitCapturedType(CapturedType t, DiagnosticPosition pos) {
-            return null;
-        }
-
-        @Override
-        public Void visitArrayType(ArrayType t, DiagnosticPosition pos) {
-            return visit(t.elemtype, pos);
-        }
-
-        @Override
-        public Void visitWildcardType(WildcardType t, DiagnosticPosition pos) {
-            return visit(t.type, pos);
-        }
-    };
-
-
 
     /** Check that usage of diamond operator is correct (i.e. diamond should not
      * be used with non-generic classes or in anonymous class creation expressions)
@@ -1145,9 +1066,6 @@ public class Check {
 
         //upward project the initializer type
         Type varType = types.upward(t, types.captures(t)).baseType();
-        if (allowPrimitiveClasses && varType.hasTag(CLASS)) {
-            checkParameterizationByPrimitiveClass(pos, varType);
-        }
         return varType;
     }
 
@@ -1434,10 +1352,6 @@ public class Check {
             }
             // Imply STRICTFP if owner has STRICTFP set.
             implicit |= sym.owner.flags_field & STRICTFP;
-
-            // primitive classes are implicitly final value classes.
-            if ((flags & PRIMITIVE_CLASS) != 0)
-                implicit |= VALUE_CLASS | FINAL;
 
             // concrete value classes are implicitly final
             if ((flags & (ABSTRACT | INTERFACE | VALUE_CLASS)) == VALUE_CLASS) {
@@ -2487,21 +2401,19 @@ public class Check {
 
     // A primitive class cannot contain a field of its own type either or indirectly.
     void checkNonCyclicMembership(JCClassDecl tree) {
-        if (allowPrimitiveClasses) {
-            Assert.check((tree.sym.flags_field & LOCKED) == 0);
-            try {
-                tree.sym.flags_field |= LOCKED;
-                for (List<? extends JCTree> l = tree.defs; l.nonEmpty(); l = l.tail) {
-                    if (l.head.hasTag(VARDEF)) {
-                        JCVariableDecl field = (JCVariableDecl) l.head;
-                        if (cyclePossible(field.sym)) {
-                            checkNonCyclicMembership((ClassSymbol) field.type.tsym, field.pos());
-                        }
+        Assert.check((tree.sym.flags_field & LOCKED) == 0);
+        try {
+            tree.sym.flags_field |= LOCKED;
+            for (List<? extends JCTree> l = tree.defs; l.nonEmpty(); l = l.tail) {
+                if (l.head.hasTag(VARDEF)) {
+                    JCVariableDecl field = (JCVariableDecl) l.head;
+                    if (cyclePossible(field.sym)) {
+                        checkNonCyclicMembership((ClassSymbol) field.type.tsym, field.pos());
                     }
                 }
-            } finally {
-                tree.sym.flags_field &= ~LOCKED;
             }
+        } finally {
+            tree.sym.flags_field &= ~LOCKED;
         }
     }
     // where
@@ -2521,7 +2433,7 @@ public class Check {
     }
         // where
         private boolean cyclePossible(VarSymbol symbol) {
-            return (symbol.flags() & STATIC) == 0 && allowPrimitiveClasses && symbol.type.isPrimitiveClass();
+            return (symbol.flags() & STATIC) == 0;
         }
 
     void checkNonCyclicDecl(JCClassDecl tree) {
