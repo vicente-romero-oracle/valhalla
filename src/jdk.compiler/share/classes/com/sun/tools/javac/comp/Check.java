@@ -851,9 +851,9 @@ public class Check {
                                 t);
     }
 
-    /** Check that type is an identity type, i.e. not a primitive/value type
-     *  nor its reference projection. When not discernible statically,
-     *  give it the benefit of doubt and defer to runtime.
+    /** Check that type is an identity type, i.e. not a value type.
+     *  When not discernible statically, give it the benefit of doubt
+     *  and defer to runtime.
      *
      *  @param pos           Position to be used for error reporting.
      *  @param t             The type to be checked.
@@ -1065,8 +1065,7 @@ public class Check {
         }
 
         //upward project the initializer type
-        Type varType = types.upward(t, types.captures(t)).baseType();
-        return varType;
+        return types.upward(t, types.captures(t)).baseType();
     }
 
     Type checkMethod(final Type mtype,
@@ -1089,7 +1088,6 @@ public class Check {
         List<Type> nonInferred = sym.type.getParameterTypes();
         if (nonInferred.length() != formals.length()) nonInferred = formals;
         Type last = useVarargs ? formals.last() : null;
-        // TODO - is enum so <init>
         if (sym.name == names.init && sym.owner == syms.enumSym) {
             formals = formals.tail.tail;
             nonInferred = nonInferred.tail.tail;
