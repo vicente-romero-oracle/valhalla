@@ -236,10 +236,6 @@ public abstract class Type extends AnnoConstruct implements TypeMirror, PoolCons
         this.metadata = metadata;
     }
 
-    public boolean isPrimitiveClass() {
-        return false;
-    }
-
     public boolean isValueClass() {
         return false;
     }

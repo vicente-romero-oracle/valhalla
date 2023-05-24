@@ -2107,8 +2107,7 @@ public class Lower extends TreeTranslator {
     /** Visitor method: Translate a single node, boxing or unboxing if needed.
      */
     public <T extends JCExpression> T translate(T tree, Type type) {
-        return (tree == null) ? null :
-                applyPrimitiveConversionsAsNeeded(boxIfNeeded(translate(tree), type), type);
+        return (tree == null) ? null : boxIfNeeded(translate(tree), type);
     }
 
     /** Visitor method: Translate tree.
@@ -3130,17 +3129,6 @@ public class Lower extends TreeTranslator {
         return result.toList();
     }
 
-    /** Apply primitive value/reference conversions as needed */
-    @SuppressWarnings("unchecked")
-    <T extends JCExpression> T applyPrimitiveConversionsAsNeeded(T tree, Type type) {
-        boolean haveValue = tree.type.isPrimitiveClass();
-        if (haveValue == type.isPrimitiveClass())
-            return tree;
-        // For narrowing conversion, insert a cast which should trigger a null check
-        // For widening conversions, insert a cast if emitting a unified class file.
-        return (T) make.TypeCast(type, tree);
-    }
-
     /** Expand a boxing or unboxing conversion if needed. */
     @SuppressWarnings("unchecked") // XXX unchecked
     <T extends JCExpression> T boxIfNeeded(T tree, Type type) {
@@ -4147,10 +4135,6 @@ public class Lower extends TreeTranslator {
             tree.selected.hasTag(SELECT) &&
             TreeInfo.name(tree.selected) == names._super &&
             !types.isDirectSuperInterface(((JCFieldAccess)tree.selected).selected.type.tsym, currentClass);
-        /* JDK-8269956: Where a reflective (class) literal is needed, the unqualified Point.class is
-         * always the "primary" mirror - representing the primitive reference runtime type - thereby
-         * always matching the behavior of Object::getClass
-         */
         tree.selected = translate(tree.selected);
         if (tree.name == names._class) {
             result = classOf(tree.selected);
