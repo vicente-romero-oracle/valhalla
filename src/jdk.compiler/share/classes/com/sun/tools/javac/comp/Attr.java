@@ -46,7 +46,6 @@ import com.sun.tools.javac.code.Scope.WriteableScope;
 import com.sun.tools.javac.code.Source.Feature;
 import com.sun.tools.javac.code.Symbol.*;
 import com.sun.tools.javac.code.Type.*;
-import com.sun.tools.javac.code.Type.ClassType.Flavor;
 import com.sun.tools.javac.code.TypeMetadata.Annotations;
 import com.sun.tools.javac.code.Types.FunctionDescriptorLookupError;
 import com.sun.tools.javac.comp.ArgumentAttr.LocalCacheContext;
@@ -1535,7 +1534,7 @@ public class Attr extends JCTree.Visitor {
             tree.elementType = types.elemtype(exprType); // perhaps expr is an array?
             if (tree.elementType == null) {
                 // or perhaps expr implements Iterable<T>?
-                Type base = types.asSuper(exprType.referenceProjectionOrSelf(), syms.iterableType.tsym);
+                Type base = types.asSuper(exprType, syms.iterableType.tsym);
                 if (base == null) {
                     log.error(tree.expr.pos(),
                               Errors.ForeachNotApplicableToType(exprType,
@@ -1551,7 +1550,7 @@ public class Attr extends JCTree.Visitor {
                     // This is the bare minimum we need to verify to make sure code generation doesn't crash.
                     Symbol iterSymbol = rs.resolveInternalMethod(tree.pos(),
                             loopEnv, types.skipTypeVars(exprType, false), names.iterator, List.nil(), List.nil());
-                    if (types.asSuper(iterSymbol.type.getReturnType().referenceProjectionOrSelf(), syms.iteratorType.tsym) == null) {
+                    if (types.asSuper(iterSymbol.type.getReturnType(), syms.iteratorType.tsym) == null) {
                         log.error(tree.pos(),
                                 Errors.ForeachNotApplicableToType(exprType, Fragments.TypeReqArrayOrIterable));
                     }
@@ -1984,7 +1983,7 @@ public class Attr extends JCTree.Visitor {
 
     void checkAutoCloseable(DiagnosticPosition pos, Env<AttrContext> env, Type resource) {
         if (!resource.isErroneous() &&
-            types.asSuper(resource.referenceProjectionOrSelf(), syms.autoCloseableType.tsym) != null &&
+            types.asSuper(resource, syms.autoCloseableType.tsym) != null &&
             !types.isSameType(resource, syms.autoCloseableType)) { // Don't emit warning for AutoCloseable itself
             Symbol close = syms.noSymbol;
             Log.DiagnosticHandler discardHandler = new Log.DiscardDiagnosticHandler(log);
@@ -2173,11 +2172,9 @@ public class Attr extends JCTree.Visitor {
                 }
             }
 
-            // Those were all the cases that could result in a primitive. See if primitive boxing and primitive
-            // value conversions bring about a convergence.
+            // Those were all the cases that could result in a primitive
             condTypes = condTypes.stream()
-                                 .map(t -> t.isPrimitive() ? types.boxedClass(t).type
-                                         : t.isReferenceProjection() ? t.valueProjection() : t)
+                                 .map(t -> t.isPrimitive() ? types.boxedClass(t).type : t)
                                  .collect(List.collector());
 
             for (Type type : condTypes) {
@@ -2191,7 +2188,7 @@ public class Attr extends JCTree.Visitor {
                                  .map(t -> chk.checkNonVoid(posIt.next(), t))
                                  .collect(List.collector());
 
-            // both are known to be reference types (or projections).  The result is
+            // both are known to be reference types.  The result is
             // lub(thentype,elsetype). This cannot fail, as it will
             // always be possible to infer "Object" if nothing better.
             return types.lub(condTypes.stream()
@@ -2638,8 +2635,7 @@ public class Attr extends JCTree.Visitor {
                                 BoundKind.EXTENDS,
                                 syms.boundClass)),
                         restype.tsym,
-                        restype.getMetadata(),
-                        restype.getFlavor());
+                        restype.getMetadata());
             } else if (msym != null &&
                     msym.owner == syms.arrayClass &&
                     methodName == names.clone &&
@@ -2832,8 +2828,7 @@ public class Attr extends JCTree.Visitor {
                 ClassType site = new ClassType(clazztype.getEnclosingType(),
                             clazztype.tsym.type.getTypeArguments(),
                                                clazztype.tsym,
-                                               clazztype.getMetadata(),
-                                               clazztype.getFlavor());
+                                               clazztype.getMetadata());
 
                 Env<AttrContext> diamondEnv = localEnv.dup(tree);
                 diamondEnv.info.selectSuper = cdef != null || tree.classDeclRemoved();
@@ -4501,7 +4496,7 @@ public class Attr extends JCTree.Visitor {
 
             if (site.isRaw()) {
                 // Determine argument types for site.
-                Type site1 = types.asSuper(env.enclClass.sym.type.referenceProjectionOrSelf(), site.tsym);
+                Type site1 = types.asSuper(env.enclClass.sym.type, site.tsym);
                 if (site1 != null) site = site1;
             }
         }
@@ -4680,7 +4675,7 @@ public class Attr extends JCTree.Visitor {
                         if (normOuter != ownOuter)
                             owntype = new ClassType(
                                 normOuter, List.nil(), owntype.tsym,
-                                owntype.getMetadata(), owntype.getFlavor());
+                                owntype.getMetadata());
                     }
                 }
                 break;
@@ -5085,7 +5080,7 @@ public class Attr extends JCTree.Visitor {
                     }
                 }
                 owntype = new ClassType(clazzOuter, actuals, clazztype.tsym,
-                                        clazztype.getMetadata(), clazztype.getFlavor());
+                                        clazztype.getMetadata());
             } else {
                 if (formals.length() != 0) {
                     log.error(tree.pos(),

@@ -210,8 +210,6 @@ public class Names {
 
     // values
     public final Name dollarValue;
-    public final Name ref;
-    public final Name val;
 
 
     // record related
@@ -402,10 +400,7 @@ public class Names {
         makeConcat = fromString("makeConcat");
         makeConcatWithConstants = fromString("makeConcatWithConstants");
 
-        // primitive classes
         dollarValue = fromString("$value");
-        ref = fromString("ref");
-        val = fromString("val");
 
         bootstrap = fromString("bootstrap");
         record = fromString("record");

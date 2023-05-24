@@ -1723,7 +1723,7 @@ public class Lower extends TreeTranslator {
 
     private JCStatement makeResourceCloseInvocation(JCExpression resource) {
         // convert to AutoCloseable if needed
-        if (types.asSuper(resource.type.referenceProjectionOrSelf(), syms.autoCloseableType.tsym) == null) {
+        if (types.asSuper(resource.type, syms.autoCloseableType.tsym) == null) {
             resource = convert(resource, syms.autoCloseableType);
         }
 
@@ -3544,7 +3544,7 @@ public class Lower extends TreeTranslator {
         private void visitIterableForeachLoop(JCEnhancedForLoop tree) {
             make_at(tree.expr.pos());
             Type iteratorTarget = syms.objectType;
-            Type iterableType = types.asSuper(types.cvarUpperBound(tree.expr.type.referenceProjectionOrSelf()),
+            Type iterableType = types.asSuper(types.cvarUpperBound(tree.expr.type),
                                               syms.iterableType.tsym);
             if (iterableType.getTypeArguments().nonEmpty())
                 iteratorTarget = types.erasure(iterableType.getTypeArguments().head);
@@ -3554,7 +3554,7 @@ public class Lower extends TreeTranslator {
                                            names.iterator,
                                            tree.expr.type,
                                            List.nil());
-            Assert.check(types.isSameType(types.erasure(types.asSuper(iterator.type.getReturnType().referenceProjectionOrSelf(), syms.iteratorType.tsym)), types.erasure(syms.iteratorType)));
+            Assert.check(types.isSameType(types.erasure(types.asSuper(iterator.type.getReturnType(), syms.iteratorType.tsym)), types.erasure(syms.iteratorType)));
             VarSymbol itvar = new VarSymbol(SYNTHETIC, names.fromString("i" + target.syntheticNameChar()),
                                             types.erasure(syms.iteratorType),
                                             currentMethodSym);
@@ -4159,7 +4159,7 @@ public class Lower extends TreeTranslator {
                 types.isDirectSuperInterface(tree.selected.type.tsym, currentClass)) {
             //default super call!! Not a classic qualified super call
             TypeSymbol supSym = tree.selected.type.tsym;
-            Assert.checkNonNull(types.asSuper(currentClass.type.referenceProjectionOrSelf(), supSym));
+            Assert.checkNonNull(types.asSuper(currentClass.type, supSym));
             result = tree;
         }
         else if (tree.name == names._this || tree.name == names._super) {

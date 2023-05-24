@@ -2291,18 +2291,10 @@ public class Gen extends JCTree.Visitor {
         // which is not statically a supertype of the expression's type.
         // For basic types, the coerce(...) in genExpr(...) will do
         // the conversion.
-        // primitive reference conversion is a nop when we bifurcate the primitive class, as the VM sees a subtyping relationship.
         if (!tree.clazz.type.isPrimitive() &&
            !types.isSameType(tree.expr.type, tree.clazz.type) &&
-            (!tree.clazz.type.isReferenceProjection() || !types.isSameType(tree.clazz.type.valueProjection(), tree.expr.type) || true) &&
-           !types.isSubtype(tree.expr.type, tree.clazz.type)) {
-            checkDimension(tree.pos(), tree.clazz.type);
-            if (tree.clazz.type.isPrimitiveClass()) {
-                code.emitop2(checkcast, new ConstantPoolQType(tree.clazz.type, types), PoolWriter::putClass);
-            } else {
-                code.emitop2(checkcast, tree.clazz.type, PoolWriter::putClass);
-            }
-
+           types.asSuper(tree.expr.type, tree.clazz.type.tsym) == null) {
+            code.emitop2(checkcast, checkDimension(tree.pos(), tree.clazz.type), PoolWriter::putClass);
         }
     }
 

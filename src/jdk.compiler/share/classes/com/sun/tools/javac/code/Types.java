@@ -268,7 +268,7 @@ public class Types {
                     formals = formals.tail;
                 }
                 if (outer1 == outer && !changed) return t;
-                else return new ClassType(outer1, typarams1.toList(), t.tsym, t.getMetadata(), t.getFlavor()) {
+                else return new ClassType(outer1, typarams1.toList(), t.tsym, t.getMetadata()) {
                     @Override
                     protected boolean needsStripping() {
                         return true;
@@ -1206,7 +1206,6 @@ public class Types {
                 // If t is an intersection, sup might not be a class type
                 if (!sup.hasTag(CLASS)) return isSubtypeNoCapture(sup, s);
                 return sup.tsym == s.tsym
-                    && (t.tsym != s.tsym || t.isReferenceProjection() == s.isReferenceProjection())
                      // Check type variable containment
                     && (!s.isParameterized() || containsTypeRecursive(s, sup))
                     && isSubtypeNoCapture(sup.getEnclosingType(),
@@ -1446,16 +1445,12 @@ public class Types {
                     return tMap.isEmpty();
                 }
                 return t.tsym == s.tsym
-                    && t.isReferenceProjection() == s.isReferenceProjection()
                     && visit(getEnclosingType(t), getEnclosingType(s))
                     && containsTypeEquivalent(t.getTypeArguments(), s.getTypeArguments());
             }
                 // where
                 private Type getEnclosingType(Type t) {
                     Type et = t.getEnclosingType();
-                    if (et.isReferenceProjection()) {
-                        et = et.valueProjection();
-                    }
                     return et;
                 }
 
@@ -1715,7 +1710,7 @@ public class Types {
     }
     // where
         private boolean areDisjoint(ClassSymbol ts, ClassSymbol ss) {
-            if (isSubtype(erasure(ts.type.referenceProjectionOrSelf()), erasure(ss.type))) {
+            if (isSubtype(erasure(ts.type), erasure(ss.type))) {
                 return false;
             }
             // if both are classes or both are interfaces, shortcut
@@ -2481,10 +2476,10 @@ public class Types {
             public Type visitClassType(ClassType t, Boolean recurse) {
                 // erasure(projection(primitive)) = projection(erasure(primitive))
                 Type erased = eraseClassType(t, recurse);
-                if (erased.hasTag(CLASS) && t.flavor != erased.getFlavor()) {
+                if (erased.hasTag(CLASS)) {
                     erased = new ClassType(erased.getEnclosingType(),
                             List.nil(), erased.tsym,
-                            erased.getMetadata(), t.flavor);
+                            erased.getMetadata());
                 }
                 return erased;
             }
@@ -2818,7 +2813,7 @@ public class Types {
                 Type outer1 = classBound(t.getEnclosingType());
                 if (outer1 != t.getEnclosingType())
                     return new ClassType(outer1, t.getTypeArguments(), t.tsym,
-                                         t.getMetadata(), t.getFlavor());
+                                         t.getMetadata());
                 else
                     return t;
             }
@@ -3989,7 +3984,7 @@ public class Types {
             // There is no spec detailing how type annotations are to
             // be inherited.  So set it to noAnnotations for now
             return new ClassType(class1.getEnclosingType(), merged.toList(),
-                                 class1.tsym, TypeMetadata.EMPTY, class1.getFlavor());
+                                 class1.tsym, TypeMetadata.EMPTY);
         }
 
     /**
@@ -4549,7 +4544,7 @@ public class Types {
 
         if (captured)
             return new ClassType(cls.getEnclosingType(), S, cls.tsym,
-                                 cls.getMetadata(), cls.getFlavor());
+                                 cls.getMetadata());
         else
             return t;
     }

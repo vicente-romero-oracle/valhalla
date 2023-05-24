@@ -52,7 +52,6 @@ import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
 
 import com.sun.tools.javac.code.Kinds.Kind;
-import com.sun.tools.javac.code.Type.ClassType.Flavor;
 import com.sun.tools.javac.comp.Annotate.AnnotationTypeMetadata;
 import com.sun.tools.javac.code.Type.*;
 import com.sun.tools.javac.comp.Attr;
@@ -1353,7 +1352,7 @@ public abstract class Symbol extends AnnoConstruct implements PoolConstant, Elem
             this(
                 flags,
                 name,
-                new ClassType(Type.noType, null, null, TypeMetadata.EMPTY, Flavor.X_Typeof_X),
+                new ClassType(Type.noType, null, null, TypeMetadata.EMPTY),
                 owner);
             this.type.tsym = this;
         }
@@ -1390,8 +1389,7 @@ public abstract class Symbol extends AnnoConstruct implements PoolConstant, Elem
             if (erasure_field == null)
                 erasure_field = new ClassType(types.erasure(type.getEnclosingType()),
                                               List.nil(), this,
-                                              type.getMetadata(),
-                                              type.getFlavor());
+                                              type.getMetadata());
             return erasure_field;
         }
 
@@ -1452,14 +1450,6 @@ public abstract class Symbol extends AnnoConstruct implements PoolConstant, Elem
                 flags_field |= (PUBLIC|STATIC);
                 this.type = new ErrorType(this, Type.noType);
                 throw ex;
-            } finally {
-                if (this.type != null && this.type.hasTag(CLASS)) {
-                    ClassType ct = (ClassType) this.type;
-                    ct.flavor = ct.flavor.metamorphose((this.flags_field & PRIMITIVE_CLASS) != 0);
-                    if (!this.type.isIntersection() && this.erasure_field != null && this.erasure_field.hasTag(CLASS)) {
-                        ((ClassType) this.erasure_field).flavor = ct.flavor;
-                    }
-                }
             }
         }
 
@@ -1647,7 +1637,6 @@ public abstract class Symbol extends AnnoConstruct implements PoolConstant, Elem
                 classType.supertype_field = null;
                 classType.interfaces_field = null;
                 classType.all_interfaces_field = null;
-                classType.flavor = Flavor.X_Typeof_X;
             }
             clearAnnotationMetadata();
         }
@@ -2070,7 +2059,7 @@ public abstract class Symbol extends AnnoConstruct implements PoolConstant, Elem
 
             // check for a direct implementation
             if (other.isOverridableIn((TypeSymbol)owner) &&
-                types.asSuper(owner.type.referenceProjectionOrSelf(), other.owner) != null &&
+                types.asSuper(owner.type, other.owner) != null &&
                 types.isSameType(erasure(types), other.erasure(types)))
                 return true;
 
@@ -2139,7 +2128,7 @@ public abstract class Symbol extends AnnoConstruct implements PoolConstant, Elem
 
             // check for a direct implementation
             if (other.isOverridableIn((TypeSymbol)owner) &&
-                types.asSuper(owner.type.referenceProjectionOrSelf(), other.owner) != null) {
+                types.asSuper(owner.type, other.owner) != null) {
                 Type mt = types.memberType(owner.type, this);
                 Type ot = types.memberType(owner.type, other);
                 if (types.isSubSignature(mt, ot)) {

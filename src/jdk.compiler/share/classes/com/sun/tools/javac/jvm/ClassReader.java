@@ -44,7 +44,6 @@ import javax.tools.JavaFileManager;
 import javax.tools.JavaFileObject;
 
 import com.sun.tools.javac.code.Source.Feature;
-import com.sun.tools.javac.code.Type.ClassType.Flavor;
 import com.sun.tools.javac.comp.Annotate;
 import com.sun.tools.javac.comp.Annotate.AnnotationTypeCompleter;
 import com.sun.tools.javac.code.*;
@@ -547,7 +546,6 @@ public class ClassReader {
         sigp++;
         Type outer = Type.noType;
         Name name;
-        ClassType.Flavor flavor;
         int startSbp = sbp;
 
         while (true) {
@@ -560,14 +558,12 @@ public class ClassReader {
                                                          sbp - startSbp));
 
                 // We are seeing QFoo; or LFoo; The name itself does not shine any light on default val-refness
-                flavor = prefix == 'L' ? Flavor.L_TypeOf_X : Flavor.Q_TypeOf_X;
                 try {
                     if (outer == Type.noType) {
                         ClassType et = (ClassType) t.erasure(types);
-                        // Todo: This spews out more objects than before, i.e no reuse with identical flavor
-                        return new ClassType(et.getEnclosingType(), List.nil(), et.tsym, et.getMetadata(), flavor);
+                        return new ClassType(et.getEnclosingType(), List.nil(), et.tsym, et.getMetadata());
                     }
-                    return new ClassType(outer, List.nil(), t, TypeMetadata.EMPTY, flavor);
+                    return new ClassType(outer, List.nil(), t, TypeMetadata.EMPTY);
                 } finally {
                     sbp = startSbp;
                 }
@@ -578,8 +574,7 @@ public class ClassReader {
                                                          startSbp,
                                                          sbp - startSbp));
                 // We are seeing QFoo; or LFoo; The name itself does not shine any light on default val-refness
-                flavor = prefix == 'L' ? Flavor.L_TypeOf_X : Flavor.Q_TypeOf_X;
-                outer = new ClassType(outer, sigToTypes('>'), t, TypeMetadata.EMPTY, flavor) {
+                outer = new ClassType(outer, sigToTypes('>'), t, TypeMetadata.EMPTY) {
                         boolean completed = false;
                         @Override @DefinedBy(Api.LANGUAGE_MODEL)
                         public Type getEnclosingType() {
@@ -643,8 +638,7 @@ public class ClassReader {
                                                  startSbp,
                                                  sbp - startSbp));
                     // We are seeing QFoo; or LFoo; The name itself does not shine any light on default val-refness
-                    flavor = prefix == 'L' ? Flavor.L_TypeOf_X : Flavor.Q_TypeOf_X;
-                    outer = new ClassType(outer, List.nil(), t, TypeMetadata.EMPTY, flavor);
+                    outer = new ClassType(outer, List.nil(), t, TypeMetadata.EMPTY);
                 }
                 signatureBuffer[sbp++] = (byte)'$';
                 continue;

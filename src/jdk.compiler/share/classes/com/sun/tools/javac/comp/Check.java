@@ -1602,13 +1602,10 @@ public class Check {
 
         public void visitSelectInternal(JCFieldAccess tree) {
             if (tree.type.tsym.isStatic() &&
-                tree.selected.type.isParameterized() &&
-                    (tree.name != names.ref || !tree.type.isReferenceProjection())) {
+                tree.selected.type.isParameterized()) {
                 // The enclosing type is not a class, so we are
                 // looking at a static member type.  However, the
                 // qualifying expression is parameterized.
-                // Tolerate the pseudo-select V.ref: V<T>.ref will be static if V<T> is and
-                // should not be confused as selecting a static member of a parameterized type.
                 log.error(tree.pos(), Errors.CantSelectStaticClassFromParamType);
             } else {
                 // otherwise validate the rest of the expression
