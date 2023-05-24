@@ -415,10 +415,6 @@ public abstract class Symbol extends AnnoConstruct implements PoolConstant, Elem
         return (flags_field & Flags.AccessFlags) == PRIVATE;
     }
 
-    public boolean isPrimitiveClass() {
-        return (flags() & PRIMITIVE_CLASS) != 0;
-    }
-
     public boolean isValueClass() {
         return !isInterface() && (flags() & VALUE_CLASS) != 0;
     }

@@ -5207,7 +5207,7 @@ public class Attr extends JCTree.Visitor {
                 implementing = bounds;
             }
             JCClassDecl cd = make.at(tree).ClassDef(
-                make.Modifiers(PUBLIC | ABSTRACT | (extending != null && TreeInfo.symbol(extending).isPrimitiveClass() ? PRIMITIVE_CLASS : 0)),
+                make.Modifiers(PUBLIC | ABSTRACT),
                 names.empty, List.nil(),
                 extending, implementing, List.nil());
 

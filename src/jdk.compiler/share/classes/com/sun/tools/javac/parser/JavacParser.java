@@ -2442,7 +2442,7 @@ public class JavacParser implements Parser {
             }
             return e;
         } else if (token.kind == LPAREN) {
-            long badModifiers = mods.flags & ~(Flags.PRIMITIVE_CLASS | Flags.VALUE_CLASS | Flags.FINAL);
+            long badModifiers = mods.flags & ~(Flags.VALUE_CLASS | Flags.FINAL);
             if (badModifiers != 0)
                 log.error(token.pos, Errors.ModNotAllowedHere(asFlagSet(badModifiers)));
             // handle type annotations for instantiations and anonymous classes
@@ -3476,10 +3476,6 @@ public class JavacParser implements Parser {
                 if (isSealedClassStart(false)) {
                     checkSourceLevel(Feature.SEALED_CLASSES);
                     flag = Flags.SEALED;
-                    break;
-                }
-                if (isPrimitiveModifier()) {
-                    flag = Flags.PRIMITIVE_CLASS;
                     break;
                 }
                 if (isValueModifier()) {
@@ -4643,32 +4639,6 @@ public class JavacParser implements Parser {
         return false;
     }
 
-    protected boolean isPrimitiveModifier() {
-        if (token.kind == IDENTIFIER && token.name() == names.primitive) {
-            boolean isPrimitiveModifier = false;
-            Token next = S.token(1);
-            switch (next.kind) {
-                case PRIVATE: case PROTECTED: case PUBLIC: case STATIC: case TRANSIENT:
-                case FINAL: case ABSTRACT: case NATIVE: case VOLATILE: case SYNCHRONIZED:
-                case STRICTFP: case MONKEYS_AT: case DEFAULT: case BYTE: case SHORT:
-                case CHAR: case INT: case LONG: case FLOAT: case DOUBLE: case BOOLEAN: case VOID:
-                case CLASS: case INTERFACE: case ENUM:
-                    isPrimitiveModifier = true;
-                    break;
-                case IDENTIFIER: // primitive record R || primitive primitive || primitive identity || primitive value || new primitive Comparable() {}
-                    if (next.name() == names.record || next.name() == names.primitive || next.name() == names.identity
-                            || next.name() == names.value || (mode & EXPR) != 0)
-                        isPrimitiveModifier = true;
-                    break;
-            }
-            if (isPrimitiveModifier) {
-                checkSourceLevel(Feature.PRIMITIVE_CLASSES);
-                return true;
-            }
-        }
-        return false;
-    }
-
     protected boolean isValueModifier() {
         if (token.kind == IDENTIFIER && token.name() == names.value) {
             boolean isValueModifier = false;
@@ -4681,9 +4651,9 @@ public class JavacParser implements Parser {
                 case CLASS: case INTERFACE: case ENUM:
                     isValueModifier = true;
                     break;
-                case IDENTIFIER: // value record R || value value || value identity || value primitive || new value Comparable() {} ??
+                case IDENTIFIER: // value record R || value value || value identity || new value Comparable() {} ??
                     if (next.name() == names.record || next.name() == names.value || next.name() == names.identity
-                            || next.name() == names.primitive || (mode & EXPR) != 0)
+                            || (mode & EXPR) != 0)
                         isValueModifier = true;
                     break;
             }
@@ -4708,7 +4678,7 @@ public class JavacParser implements Parser {
                     isIdentityModifier = true;
                     break;
                 case IDENTIFIER: // identity record R || identity primitive || || identity identity || identity value || new identity Comparable() {}
-                    if (next.name() == names.record || next.name() == names.primitive || next.name() == names.identity
+                    if (next.name() == names.record || next.name() == names.identity
                             || next.name() == names.value || (mode & EXPR) != 0)
                         isIdentityModifier = true;
                     break;

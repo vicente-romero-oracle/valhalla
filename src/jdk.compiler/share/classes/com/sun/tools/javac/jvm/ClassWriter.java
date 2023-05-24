@@ -1746,8 +1746,6 @@ public class ClassWriter extends ClassFile {
             result |= ACC_VARARGS;
         if ((flags & DEFAULT) != 0)
             result &= ~ABSTRACT;
-        if ((flags & PRIMITIVE_CLASS) != 0)
-            result |= ACC_PRIMITIVE;
         if ((flags & VALUE_CLASS) != 0)
             result |= ACC_VALUE;
         if ((flags & IDENTITY_TYPE) != 0)

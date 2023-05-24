@@ -1338,8 +1338,8 @@ public class Check {
             if ((flags & INTERFACE) != 0) implicit |= ABSTRACT;
 
             if ((flags & ENUM) != 0) {
-                // enums can't be declared abstract, final, sealed or non-sealed or primitive/value
-                mask &= ~(ABSTRACT | FINAL | SEALED | NON_SEALED | PRIMITIVE_CLASS | VALUE_CLASS);
+                // enums can't be declared abstract, final, sealed or non-sealed or value
+                mask &= ~(ABSTRACT | FINAL | SEALED | NON_SEALED | VALUE_CLASS);
                 implicit |= implicitEnumFinalFlag(tree);
             }
             if ((flags & RECORD) != 0) {
@@ -1393,11 +1393,11 @@ public class Check {
                  &&
                  checkDisjoint(pos, flags,
                                ABSTRACT | INTERFACE,
-                               FINAL | NATIVE | SYNCHRONIZED | PRIMITIVE_CLASS)
+                               FINAL | NATIVE | SYNCHRONIZED)
                  &&
                  checkDisjoint(pos, flags,
                         IDENTITY_TYPE,
-                        PRIMITIVE_CLASS | VALUE_CLASS)
+                        VALUE_CLASS)
                  &&
                  checkDisjoint(pos, flags,
                                PUBLIC,
