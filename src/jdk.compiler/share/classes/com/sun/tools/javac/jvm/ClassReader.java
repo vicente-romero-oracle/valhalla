@@ -2789,9 +2789,6 @@ public class ClassReader {
             flags &= ~ACC_MODULE;
             flags |= MODULE;
         }
-        if ((flags & ACC_PRIMITIVE) != 0) {
-            flags &= ~ACC_PRIMITIVE;
-        }
         if ((flags & ACC_VALUE) != 0) {
             flags &= ~ACC_VALUE;
             if (allowValueClasses) {
