@@ -2474,26 +2474,15 @@ public class Types {
 
             @Override
             public Type visitClassType(ClassType t, Boolean recurse) {
-                // erasure(projection(primitive)) = projection(erasure(primitive))
-                Type erased = eraseClassType(t, recurse);
-                if (erased.hasTag(CLASS)) {
-                    erased = new ClassType(erased.getEnclosingType(),
-                            List.nil(), erased.tsym,
-                            erased.getMetadata());
-                }
-                return erased;
-            }
-                // where
-                private Type eraseClassType(ClassType t, Boolean recurse) {
-                    Type erased = t.tsym.erasure(Types.this);
-                    if (recurse) {
-                        erased = new ErasedClassType(erased.getEnclosingType(), erased.tsym,
+                Type erased = t.tsym.erasure(Types.this);
+                if (recurse) {
+                    erased = new ErasedClassType(erased.getEnclosingType(), erased.tsym,
                                 t.getMetadata().without(Kind.ANNOTATIONS));
-                        return erased;
-                    } else {
-                        return combineMetadata(erased, t);
-                    }
+                    return erased;
+                } else {
+                    return combineMetadata(erased, t);
                 }
+            }
 
             @Override
             public Type visitTypeVar(TypeVar t, Boolean recurse) {
