@@ -232,6 +232,9 @@ public class Names {
     public final Name typeSwitch;
     public final Name enumSwitch;
 
+    // value classes
+    public final Name implicit;
+
     public final Name.Table table;
 
     public Names(Context context) {
@@ -416,6 +419,9 @@ public class Names {
         // pattern switches
         typeSwitch = fromString("typeSwitch");
         enumSwitch = fromString("enumSwitch");
+
+        //value classes
+        implicit = fromString("implicit");
     }
 
     protected Name.Table createTable(Options options) {

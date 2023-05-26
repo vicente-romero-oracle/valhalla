@@ -485,6 +485,12 @@ public abstract class Symbol extends AnnoConstruct implements PoolConstant, Elem
         return name == name.table.names.vnew && this.type.getReturnType().tsym == this.owner;
     }
 
+    /** Is this symbol an implicit constructor?
+     */
+    public boolean isImplicitConstructor() {
+        return isInitOrVNew() && ((flags() & IMPLICIT) != 0);
+    }
+
     /** Is this symbol a constructor or value factory?
      */
     public boolean isInitOrVNew() {

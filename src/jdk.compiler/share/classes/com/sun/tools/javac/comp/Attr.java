@@ -1163,6 +1163,14 @@ public class Attr extends JCTree.Visitor {
             for (List<JCExpression> l = tree.thrown; l.nonEmpty(); l = l.tail)
                 chk.checkType(l.head.pos(), l.head.type, syms.throwableType);
 
+            if (tree.sym.isImplicitConstructor()) {
+                if (tree.body == null) {
+                    tree.body = make.Block(0, List.nil());
+                } else {
+                    log.error(tree.pos(), Errors.ImplicitConstCantHaveBody);
+                }
+            }
+
             if (tree.body == null) {
                 // Empty bodies are only allowed for
                 // abstract, native, or interface methods, or for methods
@@ -5348,6 +5356,11 @@ public class Attr extends JCTree.Visitor {
         try {
             annotate.flush();
             attribClass(c);
+            if (c.type.isValueClass()) {
+                final Env<AttrContext> env = typeEnvs.get(c);
+                if (env != null && env.tree != null && env.tree.hasTag(CLASSDEF) && TreeInfo.getImplicitConstructor(((JCClassDecl)env.tree).defs) != null)
+                    chk.checkNonCyclicMembership((JCClassDecl)env.tree);
+            }
         } catch (CompletionFailure ex) {
             chk.completionError(pos, ex);
         }
@@ -5525,7 +5538,7 @@ public class Attr extends JCTree.Visitor {
 
                 if (c.isValueClass()) {
                     Assert.check(env.tree.hasTag(CLASSDEF));
-                    chk.checkConstraintsOfValueClass(env.tree.pos(), c);
+                    chk.checkConstraintsOfValueClass((JCClassDecl) env.tree, c);
                 }
 
                 attribClassBody(env, c);

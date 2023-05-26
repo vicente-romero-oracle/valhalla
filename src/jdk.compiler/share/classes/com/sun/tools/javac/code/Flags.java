@@ -104,11 +104,13 @@ public class Flags {
     // bit positions, we translate them when reading and writing class
     // files into unique bits positions: ACC_SYNTHETIC <-> SYNTHETIC,
     // for example.
-    public static final int ACC_IDENTITY = 0x0020;
-    public static final int ACC_VALUE    = 0x0040;
-    public static final int ACC_BRIDGE   = 0x0040;
-    public static final int ACC_VARARGS  = 0x0080;
-    public static final int ACC_MODULE   = 0x8000;
+    public static final int ACC_DEFAULT    = 0x0001;
+    public static final int ACC_NON_ATOMIC = 0x0002;
+    public static final int ACC_IDENTITY   = 0x0020;
+    public static final int ACC_VALUE      = 0x0040;
+    public static final int ACC_BRIDGE     = 0x0040;
+    public static final int ACC_VARARGS    = 0x0080;
+    public static final int ACC_MODULE     = 0x8000;
 
     /*****************************************
      * Internal compiler flags (no bits in the lower 16).
@@ -415,6 +417,11 @@ public class Flags {
      */
     public static final long NON_SEALED = 1L<<63; // ClassSymbols
 
+    /**
+     * Flag to indicate that a value class constructor is implicit
+     */
+    public static final int IMPLICIT    = 1<<59; // MethodSymbols
+
 
     /** Modifier masks.
      */
@@ -428,7 +435,7 @@ public class Flags {
         InterfaceVarFlags                 = FINAL | STATIC | PUBLIC,
         VarFlags                          = AccessFlags | FINAL | STATIC |
                                             VOLATILE | TRANSIENT | ENUM,
-        ConstructorFlags                  = AccessFlags,
+        ConstructorFlags                  = AccessFlags | IMPLICIT,
         InterfaceMethodFlags              = ABSTRACT | PUBLIC,
         MethodFlags                       = AccessFlags | ABSTRACT | STATIC | NATIVE |
                                             SYNCHRONIZED | FINAL | STRICTFP,
@@ -442,7 +449,7 @@ public class Flags {
         ExtendedClassFlags                = (long)ClassFlags | SEALED | NON_SEALED | VALUE_CLASS,
         ExtendedLocalClassFlags           = (long) LocalClassFlags | VALUE_CLASS,
         ExtendedStaticLocalClassFlags     = (long) StaticLocalClassFlags | VALUE_CLASS,
-        ModifierFlags                     = ((long)StandardFlags & ~INTERFACE) | DEFAULT | SEALED | NON_SEALED | VALUE_CLASS,
+        ModifierFlags                     = ((long)StandardFlags & ~INTERFACE) | DEFAULT | SEALED | NON_SEALED | VALUE_CLASS | IMPLICIT,
         InterfaceMethodMask               = ABSTRACT | PRIVATE | STATIC | PUBLIC | STRICTFP | DEFAULT,
         AnnotationTypeElementMask         = ABSTRACT | PUBLIC,
         LocalVarFlags                     = FINAL | PARAMETER,
@@ -469,6 +476,7 @@ public class Flags {
             if (0 != (flags & STRICTFP))  modifiers.add(Modifier.STRICTFP);
             if (0 != (flags & DEFAULT))   modifiers.add(Modifier.DEFAULT);
             if (0 != (flags & VALUE_CLASS))     modifiers.add(Modifier.VALUE);
+            if (0 != (flags & IMPLICIT))     modifiers.add(Modifier.IMPLICIT);
             modifiers = Collections.unmodifiableSet(modifiers);
             modifierSets.put(flags, modifiers);
         }
@@ -518,6 +526,7 @@ public class Flags {
                 return "identity";
             }
         },
+        IMPLICIT(Flags.IMPLICIT),
         BLOCK(Flags.BLOCK),
         FROM_SOURCE(Flags.FROM_SOURCE),
         ENUM(Flags.ENUM),
