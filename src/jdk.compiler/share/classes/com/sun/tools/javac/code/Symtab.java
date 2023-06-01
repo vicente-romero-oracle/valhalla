@@ -236,6 +236,9 @@ public class Symtab {
     public final Type objectStreamExceptionType;
     public final Type externalizableType;
 
+    // for value objects
+    public final Type nonAtomicType;
+
     /** The symbol representing the length field of an array.
      */
     public final VarSymbol lengthVar;
@@ -611,6 +614,8 @@ public class Symtab {
         ioExceptionType = enterClass("java.io.IOException");
         objectStreamExceptionType = enterClass("java.io.ObjectStreamException");
         externalizableType = enterClass("java.io.Externalizable");
+        // for value objects
+        nonAtomicType = enterClass("java.lang.NonAtomic");
 
         synthesizeEmptyInterfaceIfMissing(autoCloseableType);
         synthesizeEmptyInterfaceIfMissing(cloneableType);

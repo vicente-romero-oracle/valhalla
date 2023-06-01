@@ -1672,6 +1672,21 @@ public abstract class Symbol extends AnnoConstruct implements PoolConstant, Elem
         public List<Type> getPermittedSubclasses() {
             return permitted.map(s -> s.type);
         }
+
+        public MethodSymbol getImplicitConstructor() {
+            for (Symbol s : members().getSymbols(NON_RECURSIVE)) {
+                switch (s.kind) {
+                    case MTH:
+                        if (s.isInitOrVNew()) {
+                            if (s.isImplicitConstructor()) {
+                                return (MethodSymbol) s;
+                            }
+                        }
+                }
+            }
+            return null;
+        }
+
     }
 
 

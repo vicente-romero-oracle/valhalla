@@ -34,6 +34,7 @@ import com.sun.tools.classfile.Attributes;
 import com.sun.tools.classfile.BootstrapMethods_attribute;
 import com.sun.tools.classfile.CharacterRangeTable_attribute;
 import com.sun.tools.classfile.CharacterRangeTable_attribute.Entry;
+import com.sun.tools.classfile.ClassWriter;
 import com.sun.tools.classfile.Code_attribute;
 import com.sun.tools.classfile.CompilationID_attribute;
 import com.sun.tools.classfile.ConstantPool;
@@ -46,6 +47,7 @@ import com.sun.tools.classfile.Descriptor;
 import com.sun.tools.classfile.Descriptor.InvalidDescriptor;
 import com.sun.tools.classfile.EnclosingMethod_attribute;
 import com.sun.tools.classfile.Exceptions_attribute;
+import com.sun.tools.classfile.ImplicitCreation_attribute;
 import com.sun.tools.classfile.InnerClasses_attribute;
 import com.sun.tools.classfile.InnerClasses_attribute.Info;
 import com.sun.tools.classfile.LineNumberTable_attribute;
@@ -315,6 +317,15 @@ public class AttributeWriter extends BasicWriter
         }
     }
 
+    @Override
+    public Void visitImplicitCreation(ImplicitCreation_attribute attr, Void ignore) {
+        println("ImplicitCreation:");
+        indent(+1);
+        AccessFlags flags = new AccessFlags(attr.flags);
+        writeList(String.format("flags: (0x%04x) ", attr.flags), flags.getImplicitCreationAttrFlags(), "\n");
+        indent(-1);
+        return null;
+    }
 
     @Override
     public Void visitInnerClasses(InnerClasses_attribute attr, Void ignore) {

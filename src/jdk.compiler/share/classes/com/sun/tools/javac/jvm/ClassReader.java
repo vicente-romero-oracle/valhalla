@@ -125,6 +125,10 @@ public class ClassReader {
      */
     public boolean saveParameterNames;
 
+    /** Switch: does this value class has an implicit constructor
+     */
+    public boolean hasImplicitConstructor;
+
     /**
      * The currently selected profile.
      */
@@ -1269,6 +1273,18 @@ public class ClassReader {
                     }
                 }
             },
+            new AttributeReader(names.ImplicitCreation, V63, CLASS_ATTRIBUTE) {
+                @Override
+                protected boolean accepts(AttributeKind kind) {
+                    return super.accepts(kind) && allowValueClasses;
+                }
+                protected void read(Symbol sym, int attrLen) {
+                    if (sym.kind == TYP) {
+                        nextChar();
+                        hasImplicitConstructor = true;
+                    }
+                }
+            },
         };
 
         for (AttributeReader r: readers)
@@ -2268,6 +2284,10 @@ public class ClassReader {
                     syms.voidType,
                     type.getThrownTypes(),
                     syms.methodClass);
+            if (hasImplicitConstructor && type.getParameterTypes().size() == 0) {
+                // this has to be the implicit constructor
+                flags |= IMPLICIT;
+            }
         }
         validateMethodType(name, type);
         if (names.isInitOrVNew(name) && currentOwner.hasOuterInstance()) {

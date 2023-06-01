@@ -803,6 +803,18 @@ public class Check {
             if (encl != null && encl.hasTag(CLASS)) {
                 log.error(classDecl.pos(), Errors.ValueClassWithImplicitCannotBeInner(c));
             }
+            if ((c.flags() & HASINITBLOCK) != 0) {
+                log.error(classDecl.pos(), Errors.ValueClassWithImplicitDeclaresInitBlock(c));
+            }
+            for (Symbol s : c.members().getSymbols(NON_RECURSIVE)) {
+                switch (s.kind) {
+                    case VAR:
+                        if ((s.flags() & STATIC) == 0 & (s.flags() & HASINIT) != 0) {
+                            log.error(classDecl.pos(), Errors.ValueClassWithImplicitInstanceFieldInitializer(c));
+                        }
+                        break;
+                }
+            }
         }
     }
 

@@ -939,6 +939,19 @@ public class ClassWriter extends ClassFile {
         return 0;
     }
 
+    /** Write "ImplicitCreation" attribute.
+     */
+    int writeImplicitCreationIfNeeded(ClassSymbol csym) {
+        if (csym.isValueClass() && csym.getImplicitConstructor() != null) {
+            int alenIdx = writeAttr(names.ImplicitCreation);
+            int flags = ACC_DEFAULT | (csym.isSubClass(syms.nonAtomicType.tsym, types) ? ACC_NON_ATOMIC : 0);
+            databuf.appendChar(flags);
+            endAttr(alenIdx);
+            return 1;
+        }
+        return 0;
+    }
+
     /** Write "bootstrapMethods" attribute.
      */
     void writeBootstrapMethods() {
@@ -1686,6 +1699,10 @@ public class ClassWriter extends ClassFile {
 
         if (target.hasSealedClasses()) {
             acount += writePermittedSubclassesIfNeeded(c);
+        }
+
+        if (target.hasValueClasses()) {
+            acount += writeImplicitCreationIfNeeded(c);
         }
 
         if (!poolWriter.bootstrapMethods.isEmpty()) {
