@@ -62,6 +62,7 @@ import com.sun.tools.classfile.ModuleResolution_attribute;
 import com.sun.tools.classfile.ModuleTarget_attribute;
 import com.sun.tools.classfile.NestHost_attribute;
 import com.sun.tools.classfile.NestMembers_attribute;
+import com.sun.tools.classfile.NullRestricted_attribute;
 import com.sun.tools.classfile.Record_attribute;
 import com.sun.tools.classfile.RuntimeInvisibleAnnotations_attribute;
 import com.sun.tools.classfile.RuntimeInvisibleParameterAnnotations_attribute;
@@ -425,6 +426,12 @@ public class AttributeWriter extends BasicWriter
         print("NestHost: ");
         constantWriter.write(attr.top_index);
         println();
+        return null;
+    }
+
+    @Override
+    public Void visitNullRestricted(NullRestricted_attribute attr, Void ignore) {
+        println("NullRestricted");
         return null;
     }
 

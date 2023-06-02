@@ -1285,6 +1285,15 @@ public class ClassReader {
                     }
                 }
             },
+            new AttributeReader(names.NullRestricted, V63, MEMBER_ATTRIBUTE) {
+                @Override
+                protected boolean accepts(AttributeKind kind) {
+                    return super.accepts(kind) && allowValueClasses;
+                }
+                protected void read(Symbol sym, int attrLen) {
+                    // here we could put the nullness annotation into the field's type
+                }
+            },
         };
 
         for (AttributeReader r: readers)

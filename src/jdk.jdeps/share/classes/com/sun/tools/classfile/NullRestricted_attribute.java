@@ -25,24 +25,17 @@
 
 package com.sun.tools.classfile;
 
-import java.io.IOException;
-
-public class ImplicitCreation_attribute extends Attribute {
-
-    public int flags;
-
-    ImplicitCreation_attribute(ClassReader cr, int name_index, int length) throws IOException {
+public class NullRestricted_attribute extends Attribute {
+    NullRestricted_attribute(ClassReader cr, int name_index, int length) {
         super(name_index, length);
-        flags = cr.readUnsignedShort();
     }
 
-    public ImplicitCreation_attribute(int name_index, int flags) {
-        super(name_index, 2);
-        this.flags = flags;
+    public NullRestricted_attribute(int name_index) {
+        super(name_index, 0);
     }
 
     @Override
     public <R, D> R accept(Visitor<R, D> visitor, D data) {
-        return visitor.visitImplicitCreation(this, data);
+        return visitor.visitNullRestricted(this, data);
     }
 }

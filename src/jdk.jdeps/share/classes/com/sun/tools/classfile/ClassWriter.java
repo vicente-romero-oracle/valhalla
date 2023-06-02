@@ -539,6 +539,11 @@ public class ClassWriter {
         }
 
         @Override
+        public Void visitNullRestricted(NullRestricted_attribute attr, ClassOutputStream out) {
+            return null;
+        }
+
+        @Override
         public Void visitMethodParameters(MethodParameters_attribute attr, ClassOutputStream out) {
             out.writeByte(attr.method_parameter_table.length);
             for (MethodParameters_attribute.Entry e : attr.method_parameter_table) {
