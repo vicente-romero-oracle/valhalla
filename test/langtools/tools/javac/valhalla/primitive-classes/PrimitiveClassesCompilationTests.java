@@ -219,7 +219,7 @@ public class PrimitiveClassesCompilationTests extends CompilationTestCase {
                 """
         };
         for (String source : sources) {
-            assertFail("compiler.err.cant.assign.val.to.final.var", source);
+            assertFail("compiler.err.cant.assign.val.to.var", source);
         }
 
         assertFail("compiler.err.var.might.already.be.assigned",
@@ -320,7 +320,7 @@ public class PrimitiveClassesCompilationTests extends CompilationTestCase {
                 """,
         };
         for (String source : sources) {
-            assertFail("compiler.err.cant.assign.val.to.final.var", source);
+            assertFail("compiler.err.cant.assign.val.to.var", source);
         }
     }
 

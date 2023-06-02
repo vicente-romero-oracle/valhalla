@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999, 2021, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1999, 2023, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -165,6 +165,7 @@ public class ClassWriter extends ClassFile {
 
     /** Construct a class writer, given an options table.
      */
+    @SuppressWarnings("this-escape")
     protected ClassWriter(Context context) {
         context.put(classWriterKey, this);
 
@@ -386,7 +387,7 @@ public class ClassWriter extends ClassFile {
     /**
      * Write method parameter names attribute.
      */
-    int writeMethodParametersAttr(MethodSymbol m) {
+    int writeMethodParametersAttr(MethodSymbol m, boolean writeParamNames) {
         MethodType ty = m.externalType(types).asMethodType();
         final int allparams = ty.argtypes.size();
         if (m.params != null && allparams != 0) {
@@ -397,7 +398,10 @@ public class ClassWriter extends ClassFile {
                 final int flags =
                     ((int) s.flags() & (FINAL | SYNTHETIC | MANDATED)) |
                     ((int) m.flags() & SYNTHETIC);
-                databuf.appendChar(poolWriter.putName(s.name));
+                if (writeParamNames)
+                    databuf.appendChar(poolWriter.putName(s.name));
+                else
+                    databuf.appendChar(0);
                 databuf.appendChar(flags);
             }
             // Now write the real parameters
@@ -405,7 +409,10 @@ public class ClassWriter extends ClassFile {
                 final int flags =
                     ((int) s.flags() & (FINAL | SYNTHETIC | MANDATED)) |
                     ((int) m.flags() & SYNTHETIC);
-                databuf.appendChar(poolWriter.putName(s.name));
+                if (writeParamNames)
+                    databuf.appendChar(poolWriter.putName(s.name));
+                else
+                    databuf.appendChar(0);
                 databuf.appendChar(flags);
             }
             // Now write the captured locals
@@ -413,7 +420,10 @@ public class ClassWriter extends ClassFile {
                 final int flags =
                     ((int) s.flags() & (FINAL | SYNTHETIC | MANDATED)) |
                     ((int) m.flags() & SYNTHETIC);
-                databuf.appendChar(poolWriter.putName(s.name));
+                if (writeParamNames)
+                    databuf.appendChar(poolWriter.putName(s.name));
+                else
+                    databuf.appendChar(0);
                 databuf.appendChar(flags);
             }
             endAttr(attrIndex);
@@ -970,6 +980,15 @@ public class ClassWriter extends ClassFile {
      */
     void writeBootstrapMethods() {
         int alenIdx = writeAttr(names.BootstrapMethods);
+        int lastBootstrapMethods;
+        do {
+            lastBootstrapMethods = poolWriter.bootstrapMethods.size();
+            for (BsmKey bsmKey : java.util.List.copyOf(poolWriter.bootstrapMethods.keySet())) {
+                for (LoadableConstant arg : bsmKey.staticArgs) {
+                    poolWriter.putConstant(arg);
+                }
+            }
+        } while (lastBootstrapMethods < poolWriter.bootstrapMethods.size());
         databuf.appendChar(poolWriter.bootstrapMethods.size());
         for (BsmKey bsmKey : poolWriter.bootstrapMethods.keySet()) {
             //write BSM handle
@@ -1060,17 +1079,37 @@ public class ClassWriter extends ClassFile {
             endAttr(alenIdx);
             acount++;
         }
-        if (target.hasMethodParameters() && (
-                options.isSet(PARAMETERS)
-                || ((m.flags_field & RECORD) != 0 && (m.isInitOrVNew() || m.isValueObjectFactory())))) {
-            if (!m.isLambdaMethod()) // Per JDK-8138729, do not emit parameters table for lambda bodies.
-                acount += writeMethodParametersAttr(m);
+        if (target.hasMethodParameters()) {
+            if (!m.isLambdaMethod()) { // Per JDK-8138729, do not emit parameters table for lambda bodies.
+                boolean requiresParamNames = requiresParamNames(m);
+                if (requiresParamNames || requiresParamFlags(m))
+                    acount += writeMethodParametersAttr(m, requiresParamNames);
+            }
         }
         acount += writeMemberAttrs(m, false);
         if (!m.isLambdaMethod())
             acount += writeParameterAttrs(m.params);
         acount += writeExtraAttributes(m);
         endAttrs(acountIdx, acount);
+    }
+
+    private boolean requiresParamNames(MethodSymbol m) {
+        if (options.isSet(PARAMETERS))
+            return true;
+        if ((m.isInitOrVNew() || m.isValueObjectFactory()) && (m.flags_field & RECORD) != 0)
+            return true;
+        return false;
+    }
+
+    private boolean requiresParamFlags(MethodSymbol m) {
+        if (!m.extraParams.isEmpty()) {
+            return m.extraParams.stream().anyMatch(p -> (p.flags_field & (SYNTHETIC | MANDATED)) != 0);
+        }
+        if (m.params != null) {
+            // parameter is stored in params for Enum#valueOf(name)
+            return m.params.stream().anyMatch(p -> (p.flags_field & (SYNTHETIC | MANDATED)) != 0);
+        }
+        return false;
     }
 
     /** Write code attribute of method.

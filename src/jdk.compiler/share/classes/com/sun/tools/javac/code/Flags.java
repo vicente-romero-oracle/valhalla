@@ -30,6 +30,7 @@ import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import javax.lang.model.element.Modifier;
 
@@ -301,9 +302,8 @@ public class Flags {
     public static final long THROWS = 1L<<47;
 
     /**
-     * Flag that marks potentially ambiguous overloads
+     * Currently available: Bit 48.
      */
-    public static final long POTENTIALLY_AMBIGUOUS = 1L<<48;
 
     /**
      * Flag that marks a synthetic method body for a lambda expression
@@ -422,6 +422,15 @@ public class Flags {
      */
     public static final int IMPLICIT    = 1<<59; // MethodSymbols
 
+    /**
+     * Describe modifier flags as they migh appear in source code, i.e.,
+     * separated by spaces and in the order suggested by JLS 8.1.1.
+     */
+    public static String toSource(long flags) {
+        return asModifierSet(flags).stream()
+          .map(Modifier::toString)
+          .collect(Collectors.joining(" "));
+    }
 
     /** Modifier masks.
      */
@@ -563,7 +572,7 @@ public class Flags {
         DEPRECATED_ANNOTATION(Flags.DEPRECATED_ANNOTATION),
         DEPRECATED_REMOVAL(Flags.DEPRECATED_REMOVAL),
         HAS_RESOURCE(Flags.HAS_RESOURCE),
-        POTENTIALLY_AMBIGUOUS(Flags.POTENTIALLY_AMBIGUOUS),
+        // Bit 48 is currently available
         ANONCONSTR_BASED(Flags.ANONCONSTR_BASED),
         NAME_FILLED(Flags.NAME_FILLED),
         PREVIEW_API(Flags.PREVIEW_API),
