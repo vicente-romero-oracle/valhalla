@@ -144,33 +144,6 @@ public class BangTypesCompilationTests extends CompilationTestCase {
         );
     }
 
-    public void testMemberAccess() {
-        testList(
-                List.of(
-                        new DiagAndCode(
-                                """
-                                class Foo {
-                                    void m(String? s) {
-                                        String s2 = s.toString();
-                                    }
-                                }
-                                """,
-                                Result.Warning,
-                                "compiler.warn.accessing.member.of.nullable"),
-                        new DiagAndCode(
-                                """
-                                class Foo<T> {
-                                    void m(T* t) {
-                                        String s = t.toString();
-                                    }
-                                }
-                                """,
-                                Result.Warning,
-                                "compiler.warn.accessing.member.of.parametric")
-                )
-        );
-    }
-
     public void testWarnUninitialized() {
         testList(
                 List.of(
@@ -221,15 +194,7 @@ public class BangTypesCompilationTests extends CompilationTestCase {
                                 }
                                 """,
                                 Result.Warning,
-                                "compiler.warn.non.nullable.should.be.initialized"),
-                        new DiagAndCode(
-                                """
-                                class Foo {
-                                    String* s;
-                                }
-                                """,
-                                Result.Warning,
-                                "compiler.warn.parametric.should.be.initialized")
+                                "compiler.warn.non.nullable.should.be.initialized")
                 )
         );
     }
@@ -240,36 +205,30 @@ public class BangTypesCompilationTests extends CompilationTestCase {
                         new DiagAndCode(
                                 """
                                 class Foo {
-                                    void m(String! s1, String? s2, String s3) {
-                                        s1 = s2;
+                                    void m(String! s1, String s3) {
                                         s1 = s3;
-                                        s2 = s3;
                                     }
                                 }
                                 """,
                                 Result.Warning,
                                 "compiler.warn.unchecked.nullness.conversion",
-                                3),
+                                1),
                         new DiagAndCode(
                                 """
                                 class Foo {
-                                    void m(Object! s1, String? s2, String s3) {
-                                        s1 = s2;
+                                    void m(Object! s1, String s3) {
                                         s1 = s3;
-                                        s2 = s3;
                                     }
                                 }
                                 """,
                                 Result.Warning,
                                 "compiler.warn.unchecked.nullness.conversion",
-                                3),
+                                1),
                         new DiagAndCode(
                                 """
                                 class Foo {
-                                    void m(String! s1, String? s2, String s3) {
-                                        s2 = s1;
+                                    void m(String! s1, String s3) {
                                         s3 = s1;
-                                        s3 = s2;
                                     }
                                 }
                                 """,
@@ -278,135 +237,53 @@ public class BangTypesCompilationTests extends CompilationTestCase {
                         new DiagAndCode(
                                 """
                                 class Foo<T extends String!> {
-                                    Foo<String?> f1;
                                     Foo<String> f2;
                                 }
                                 """,
                                 Result.Warning,
                                 "compiler.warn.unchecked.nullness.conversion",
-                                2),
+                                1),
                         new DiagAndCode(
                                 """
                                 class Foo<T extends Object!> {
-                                    Foo<String?> f1;
                                     Foo<String> f2;
                                 }
                                 """,
                                 Result.Warning,
                                 "compiler.warn.unchecked.nullness.conversion",
-                                2),
-                        new DiagAndCode(
-                                """
-                                class Foo<T extends String?> {
-                                    Foo<String> f2;
-                                }
-                                """,
-                                Result.Warning,
-                                "compiler.warn.unchecked.nullness.conversion"),
-                        new DiagAndCode(
-                                """
-                                class Foo<T extends Object?> {
-                                    Foo<String> f2;
-                                }
-                                """,
-                                Result.Warning,
-                                "compiler.warn.unchecked.nullness.conversion"),
-                        new DiagAndCode(
-                                """
-                                class Foo<T extends String?> {
-                                    Foo<String!> f1;
-                                }
-                                """,
-                                Result.Clean,
-                                ""),
-                        new DiagAndCode(
-                                """
-                                class Foo<T extends Object?> {
-                                    Foo<String!> f1;
-                                }
-                                """,
-                                Result.Clean,
-                                ""),
-                        new DiagAndCode(
-                                """
-                                class Foo<T extends String?> {
-                                    Foo<String?> f1;
-                                }
-                                """,
-                                Result.Clean,
-                                ""),
-                        new DiagAndCode(
-                                """
-                                class Foo<T extends Object?> {
-                                    Foo<String?> f1;
-                                }
-                                """,
-                                Result.Clean,
-                                ""),
-                        new DiagAndCode(
-                                """
-                                class Box<T> {
-                                    T* val;
-                                    public Box() { val = null; }
-                                    void m() {
-                                        Box<String?> b1 = new Box<String?>();
-                                        String! s = b1.val;
-                                    }
-                                }
-                                """,
-                                Result.Warning,
-                                "compiler.warn.unchecked.nullness.conversion"),
-                        new DiagAndCode(
-                                """
-                                class Box<T> {
-                                    T* val;
-                                    public Box() { val = null; }
-                                    void m() {
-                                        Box<String> b1 = new Box<String>();
-                                        String! s = b1.val;
-                                    }
-                                }
-                                """,
-                                Result.Warning,
-                                "compiler.warn.unchecked.nullness.conversion"),
+                                1),
 
                         // wildcards
                         new DiagAndCode(
                                 """
                                 import java.util.*;
                                 class Foo {
-                                    void test(List<? extends String!> ls1, List<? extends String?> ls2, List<? extends String> ls3) {
-                                        ls1 = ls2;
+                                    void test(List<? extends String!> ls1, List<? extends String> ls3) {
                                         ls1 = ls3;
-                                        ls2 = ls3;
                                     }
                                 }
                                 """,
                                 Result.Warning,
                                 "compiler.warn.unchecked.nullness.conversion",
-                                3),
+                                1),
                         new DiagAndCode(
                                 """
                                 import java.util.*;
                                 class Foo {
-                                    void test(List<? extends Object!> ls1, List<? extends String?> ls2, List<? extends String> ls3) {
-                                        ls1 = ls2;
+                                    void test(List<? extends Object!> ls1, List<? extends String> ls3) {
                                         ls1 = ls3;
-                                        ls2 = ls3;
                                     }
                                 }
                                 """,
                                 Result.Warning,
                                 "compiler.warn.unchecked.nullness.conversion",
-                                3),
+                                1),
                         new DiagAndCode(
                                 """
                                 import java.util.*;
                                 class Foo {
-                                    void test(List<? extends String!> ls1, List<? extends String?> ls2, List<? extends String> ls3) {
-                                        ls2 = ls1;
+                                    void test(List<? extends String!> ls1, List<? extends String> ls3) {
                                         ls3 = ls1;
-                                        ls3 = ls2;
                                     }
                                 }
                                 """,
@@ -416,32 +293,8 @@ public class BangTypesCompilationTests extends CompilationTestCase {
                                 """
                                 import java.util.*;
                                 class Foo {
-                                    void test(List<? extends String!> ls1, List<? extends Object?> ls2, List<? extends Object> ls3) {
-                                        ls2 = ls1;
+                                    void test(List<? extends String!> ls1, List<? extends Object> ls3) {
                                         ls3 = ls1;
-                                        ls3 = ls2;
-                                    }
-                                }
-                                """,
-                                Result.Clean,
-                                "")
-                )
-        );
-    }
-
-    public void testCastWarnings() {
-        testList(
-                List.of(
-                        new DiagAndCode(
-                                """
-                                class Foo<T> {
-                                    @SuppressWarnings("unchecked")
-                                    void m(T* o1, Object? o2, Object o3) {
-                                        Object! v1 = (Object!)o1;
-                                        Object! v2 = (Object!)o2;
-                                        Object! v3 = (Object!)o3;
-                                        // some cases missing here for parametric
-                                        Object? v4 = (Object?)o3;
                                     }
                                 }
                                 """,
@@ -465,18 +318,6 @@ public class BangTypesCompilationTests extends CompilationTestCase {
                                 }
                                 """,
                                 Result.Clean,
-                                "" /* no warnings in this case */),
-                        new DiagAndCode(
-                                """
-                                import java.util.*;
-                                class Foo {
-                                     void m(List<? super String?> ls1) {}
-                                     void test(List<? super String?> ls2) {
-                                         m(ls2);
-                                     }
-                                }
-                                """,
-                                Result.Clean,
                                 "" /* no warnings in this case */)
                 )
         );
@@ -487,24 +328,24 @@ public class BangTypesCompilationTests extends CompilationTestCase {
                 List.of(
                         new DiagAndCode(
                                 """
-                                class A {
-                                    String? lookup(String arg) { return null; }
+                                abstract class A {
+                                    abstract String! lookup(String arg);
                                 }
-
-                                class B extends A {
-                                    String lookup(String arg) { return null; }
+                                                                
+                                abstract class B extends A {
+                                    abstract String lookup(String arg);
                                 }
                                 """,
                                 Result.Warning,
                                 "compiler.warn.overrides.with.different.nullness.1"),
                         new DiagAndCode(
                                 """
-                                class A {
-                                    String lookup(String? arg) { return null; }
+                                abstract class A {
+                                    abstract String lookup(String! arg);
                                 }
 
-                                class B extends A {
-                                    String lookup(String arg) { return null; }
+                                abstract class B extends A {
+                                    abstract String lookup(String arg);
                                 }
                                 """,
                                 Result.Warning,

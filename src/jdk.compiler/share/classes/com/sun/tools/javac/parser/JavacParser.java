@@ -1121,7 +1121,7 @@ public class JavacParser implements Parser {
                     JCModifiers mods = optFinal(0);
                     int typePos = token.pos;
                     JCExpression type = unannotatedType(false, NOQUES | TYPE);
-                    if (token.kind == QUES) {
+                    if (token.kind == QUES && EMOTIONAL_QUALIFIER.test(token.kind)) {
                         if (peekToken(IDENTIFIER, COMMA) || peekToken(IDENTIFIER, SEMI) ||
                                 peekToken(IDENTIFIER, RPAREN) || peekToken(IDENTIFIER, INSTANCEOF_INFIX)) {
                             setNullMarker(type);
@@ -1631,7 +1631,7 @@ public class JavacParser implements Parser {
                 }
             }
             if (typeArgs != null) illegal();
-            if (token.kind == QUES || token.kind == BANG || (token.kind == STAR)) {
+            if (EMOTIONAL_QUALIFIER.test(token.kind) && (token.kind == QUES || token.kind == BANG || (token.kind == STAR))) {
                 if (peekToken(LBRACKET) || peekToken(LT) || emotionalMarkersOK) {
                     selectTypeMode();
                     setNullMarker(t);
@@ -2118,7 +2118,7 @@ public class JavacParser implements Parser {
 
     /** Accepts all identifier-like tokens */
     protected Predicate<TokenKind> LAX_IDENTIFIER = t -> t == IDENTIFIER || t == UNDERSCORE || t == ASSERT || t == ENUM;
-    protected Predicate<TokenKind> EMOTIONAL_QUALIFIER = t -> t == BANG || (t == QUES && !isMode(NOQUES)) || t == STAR;
+    protected Predicate<TokenKind> EMOTIONAL_QUALIFIER = t -> t == BANG;
     protected Predicate<TokenKind> GENERIC_TYPE_END = t -> t == GT || t == GTGT || t == GTGTGT;
     protected Predicate<TokenKind> INSTANCEOF_INFIX = t -> t == AMPAMP || t == BARBAR ||
                                                            t == EQEQ || t == BANGEQ;
@@ -3436,9 +3436,9 @@ public class JavacParser implements Parser {
                         }
                     }
                     break;
-                case BANG, QUES:
+                case BANG:
                     if (!peekToken(lookahead, LPAREN)) break;
-                case DOT, EXTENDS, SUPER, COMMA: break;
+                case DOT, QUES, EXTENDS, SUPER, COMMA: break;
                 case LT: typeDepth++; break;
                 case GTGTGT: typeDepth--;
                 case GTGT: typeDepth--;
