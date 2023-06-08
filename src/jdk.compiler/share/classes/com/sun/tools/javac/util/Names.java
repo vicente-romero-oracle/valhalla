@@ -248,6 +248,8 @@ public class Names {
 
     // value classes
     public final Name implicit;
+    public final Name newInstance;
+    public final Name asNullRestrictedType;
 
     public final Name.Table table;
 
@@ -451,6 +453,8 @@ public class Names {
 
         //value classes
         implicit = fromString("implicit");
+        newInstance = fromString("newInstance");
+        asNullRestrictedType = fromString("asNullRestrictedType");
     }
 
     protected Name.Table createTable(Options options) {
