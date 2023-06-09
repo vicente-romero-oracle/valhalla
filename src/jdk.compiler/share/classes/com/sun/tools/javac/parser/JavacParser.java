@@ -689,6 +689,10 @@ public class JavacParser implements Parser {
                 t = toP(F.at(tyannos.head.pos).AnnotatedType(tyannos, t));
             }
         }
+        if (EMOTIONAL_QUALIFIER.test(token.kind)) {
+            setNullMarker(t);
+            nextToken();
+        }
         return t;
     }
 

@@ -4203,6 +4203,8 @@ public class Lower extends TreeTranslator {
     }
 
     public void visitNewArray(JCNewArray tree) {
+        // nullness info could be lost in the translation process, let's keep the original element type
+        JCExpression originalElemType = tree.elemtype;
         tree.elemtype = translate(tree.elemtype);
         int noOfDims = 0;
         for (List<JCExpression> t = tree.dims; t.tail != null; t = t.tail) {
@@ -4210,7 +4212,7 @@ public class Lower extends TreeTranslator {
             noOfDims++;
         }
         tree.elems = translate(tree.elems, types.elemtype(tree.type));
-        if (tree.elemtype == null || !tree.elemtype.type.isNonNullable()) {
+        if (tree.elemtype == null || !originalElemType.type.isNonNullable()) {
             result = tree;
         } else {
             Symbol elemClass = syms.getClassField(tree.elemtype.type, types);
