@@ -1350,6 +1350,9 @@ public class Check {
                     if ((flags & PUBLIC) == 0) {
                         log.error(pos, Errors.ImplicitConstMustBePublic);
                     }
+                    if ((sym.owner.flags_field & VALUE_CLASS) == 0) {
+                        log.error(pos, Errors.ImplicitConstMustBeDeclaredInValueClass);
+                    }
                     mask = ImplicitConstructorFlags;
                 } else {
                     mask = ConstructorFlags;
