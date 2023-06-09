@@ -868,4 +868,35 @@ public class ValueObjectCompilationTests extends CompilationTestCase {
                 """
         );
     }
+
+    public void testImplicitConstructor() {
+        assertOK(
+                """
+                value class V {
+                    public implicit V();
+                }
+                """
+        );
+        assertFail("compiler.err.implicit.const.must.be.public",
+                """
+                value class V {
+                    implicit V();
+                }
+                """
+        );
+        assertFail("compiler.err.implicit.const.must.be.public",
+                """
+                value class V {
+                    private implicit V();
+                }
+                """
+        );
+        assertFail("compiler.err.implicit.const.must.be.public",
+                """
+                value class V {
+                    protected implicit V();
+                }
+                """
+        );
+    }
 }

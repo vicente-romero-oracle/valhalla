@@ -444,7 +444,8 @@ public class Flags {
         InterfaceVarFlags                 = FINAL | STATIC | PUBLIC,
         VarFlags                          = AccessFlags | FINAL | STATIC |
                                             VOLATILE | TRANSIENT | ENUM,
-        ConstructorFlags                  = AccessFlags | IMPLICIT,
+        ConstructorFlags                  = AccessFlags,
+        ImplicitConstructorFlags          = PUBLIC | IMPLICIT,
         InterfaceMethodFlags              = ABSTRACT | PUBLIC,
         MethodFlags                       = AccessFlags | ABSTRACT | STATIC | NATIVE |
                                             SYNCHRONIZED | FINAL | STRICTFP,
