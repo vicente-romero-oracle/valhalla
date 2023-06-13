@@ -42,12 +42,18 @@ import java.io.File;
 
 import java.util.List;
 
+import com.sun.tools.javac.util.Assert;
+
+import com.sun.tools.classfile.Attribute;
+import com.sun.tools.classfile.Attributes;
 import com.sun.tools.classfile.ClassFile;
 import com.sun.tools.classfile.Code_attribute;
 import com.sun.tools.classfile.ConstantPool;
 import com.sun.tools.classfile.ConstantPool.CONSTANT_Class_info;
 import com.sun.tools.classfile.ConstantPool.CONSTANT_Fieldref_info;
 import com.sun.tools.classfile.ConstantPool.CONSTANT_Methodref_info;
+import com.sun.tools.classfile.ImplicitCreation_attribute;
+import com.sun.tools.classfile.NullRestricted_attribute;
 import com.sun.tools.classfile.Field;
 import com.sun.tools.classfile.Instruction;
 import com.sun.tools.classfile.Method;
@@ -960,5 +966,62 @@ public class ValueObjectCompilationTests extends CompilationTestCase {
                 }
                 """
         );
+    }
+
+    public void testClassAttributes() throws Exception {
+        String code =
+                """
+                value class V1 {
+                    String! f1;
+                    String f2;
+                    public implicit V1();
+                }
+                
+                value class V2 {
+                    public V2() {}
+                }
+                """;
+
+        File dir = assertOK(true, code);
+
+        // test for V1
+        ClassFile classFile = ClassFile.read(findClassFileOrFail(dir, "V1.class"));
+
+        Field field1 = classFile.fields[0];
+        findAttributeOrFail(field1.attributes, NullRestricted_attribute.class);
+        Field field2 = classFile.fields[1];
+        try {
+            findAttributeOrFail(field2.attributes, NullRestricted_attribute.class);
+            throw new AssertionError("NullRestricted attribute shouldn't be here");
+        } catch (Throwable t) {
+            // good
+        }
+        findAttributeOrFail(classFile.attributes, ImplicitCreation_attribute.class);
+
+        classFile = ClassFile.read(findClassFileOrFail(dir, "V2.class"));
+        try {
+            findAttributeOrFail(classFile.attributes, ImplicitCreation_attribute.class);
+            throw new AssertionError("ImplicitCreation attribute shouldn't be here");
+        } catch (Throwable t) {
+            // good
+        }
+    }
+
+    private File findClassFileOrFail(File dir, String name) {
+        for (final File fileEntry : dir.listFiles()) {
+            if (fileEntry.getName().equals(name)) {
+                return fileEntry;
+            }
+        }
+        throw new AssertionError("file not found");
+    }
+
+    private Attribute findAttributeOrFail(Attributes attributes, Class<? extends Attribute> attrClass) {
+        for (Attribute attribute : attributes) {
+            if (attribute.getClass() == attrClass) {
+                return attribute;
+            }
+        }
+        throw new AssertionError("attribute not found");
     }
 }
