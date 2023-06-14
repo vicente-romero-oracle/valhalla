@@ -939,6 +939,17 @@ public class ValueObjectCompilationTests extends CompilationTestCase {
                 }
                 """
         );
+        assertFail("compiler.err.value.class.with.implicit.cannot.be.inner",
+                """
+                class Outer {
+                    void m() {
+                        value class V {
+                            public implicit V();
+                        }
+                    }
+                }
+                """
+        );
         assertFail("compiler.err.cyclic.primitive.class.membership",
                 """
                 value class V {
