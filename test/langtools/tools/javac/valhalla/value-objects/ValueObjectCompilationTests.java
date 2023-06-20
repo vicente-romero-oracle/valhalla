@@ -890,6 +890,13 @@ public class ValueObjectCompilationTests extends CompilationTestCase {
                 }
                 """
         );
+        assertFail("compiler.err.implicit.const.cant.have.body",
+                """
+                value class V {
+                    public implicit V() {}
+                }
+                """
+        );
         assertFail("compiler.err.implicit.const.must.be.public",
                 """
                 value class V {
@@ -979,6 +986,24 @@ public class ValueObjectCompilationTests extends CompilationTestCase {
         );
     }
 
+    private File findClassFileOrFail(File dir, String name) {
+        for (final File fileEntry : dir.listFiles()) {
+            if (fileEntry.getName().equals(name)) {
+                return fileEntry;
+            }
+        }
+        throw new AssertionError("file not found");
+    }
+
+    private Attribute findAttributeOrFail(Attributes attributes, Class<? extends Attribute> attrClass) {
+        for (Attribute attribute : attributes) {
+            if (attribute.getClass() == attrClass) {
+                return attribute;
+            }
+        }
+        throw new AssertionError("attribute not found");
+    }
+
     public void testClassAttributes() throws Exception {
         String code =
                 """
@@ -1018,21 +1043,21 @@ public class ValueObjectCompilationTests extends CompilationTestCase {
         }
     }
 
-    private File findClassFileOrFail(File dir, String name) {
-        for (final File fileEntry : dir.listFiles()) {
-            if (fileEntry.getName().equals(name)) {
-                return fileEntry;
-            }
-        }
-        throw new AssertionError("file not found");
-    }
-
-    private Attribute findAttributeOrFail(Attributes attributes, Class<? extends Attribute> attrClass) {
-        for (Attribute attribute : attributes) {
-            if (attribute.getClass() == attrClass) {
-                return attribute;
-            }
-        }
-        throw new AssertionError("attribute not found");
+    public void testImplementingNonAtomic() {
+        assertFail("compiler.err.cant.implement.non.atomic",
+                """
+                class V implements NonAtomic {}
+                """
+        );
+        assertFail("compiler.err.cant.implement.non.atomic",
+                """
+                value class V implements NonAtomic {}
+                """
+        );
+        assertOK(
+                """
+                abstract class V implements NonAtomic {}
+                """
+        );
     }
 }
