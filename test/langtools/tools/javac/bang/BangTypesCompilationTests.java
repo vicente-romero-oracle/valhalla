@@ -650,7 +650,7 @@ public class BangTypesCompilationTests extends CompilationTestCase {
                         new DiagAndCode(
                                 """
                                 class Test {
-                                    void m(Test t1, Test[] t2, Test[][] t3, Test[][][] t4) {
+                                    void m(Test t1, Test![]! t2, Test![]![]! t3, Test![]![]![]! t4) {
                                         Test! l1 = (Test!) t1;
                                         Test![] l2 = (Test![]) t2;
                                         Test![][] l3 = (Test![][]) t3;
@@ -662,6 +662,9 @@ public class BangTypesCompilationTests extends CompilationTestCase {
 
                                         Test[]![]! l8 = (Test[]![]!) t3;
                                         Test[]![]![]! l9 = (Test[]![]![]!) t4;
+
+                                        Test![]![]! l10 = (Test![]![]!) t3;
+                                        Test![]![]![]! l11 = (Test![]![]![]!) t4;
                                     }
                                 }
                                 """,
